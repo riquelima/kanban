@@ -1,5 +1,6 @@
 {
   "name": "Copy - Planejamento Semanal",
   "description": "Um sistema web para planejamento semanal de tarefas, com tema escuro, drag-and-drop e checklists interativos.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "prompt": ""
 }

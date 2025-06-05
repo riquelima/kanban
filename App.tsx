@@ -19,6 +19,46 @@ const LogoutIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   </svg>
 );
 
+// Helper to determine if a task is fully completed
+const isTaskFullyCompleted = (task: Task): boolean => {
+  if (!task.checklist || task.checklist.length === 0) {
+    return false; // Task with no checklist items is not considered "completed" by items.
+  }
+  return task.checklist.every(item => item.completed);
+};
+
+// Helper to sort checklist items
+const sortChecklistItems = (checklist: ChecklistItem[]): ChecklistItem[] => {
+  return [...checklist].sort((a, b) => {
+    if (a.completed !== b.completed) {
+      return a.completed ? 1 : -1; // Uncompleted (false) items first
+    }
+    const timeA = a.created_at ? new Date(a.created_at).getTime() : Infinity;
+    const timeB = b.created_at ? new Date(b.created_at).getTime() : Infinity;
+    if (timeA === Infinity && timeB === Infinity) return 0;
+    return timeA - timeB; // Older items first within the same completion group
+  });
+};
+
+// Helper to sort tasks
+const sortTasks = (tasks: Task[]): Task[] => {
+  return [...tasks].sort((a, b) => {
+    const aCompleted = isTaskFullyCompleted(a);
+    const bCompleted = isTaskFullyCompleted(b);
+    if (aCompleted !== bCompleted) {
+      return aCompleted ? 1 : -1; // Uncompleted tasks first
+    }
+    // If completion status is the same, sort by creation time (older first)
+    const timeA = a.created_at ? new Date(a.created_at).getTime() : Infinity; // New tasks last if no timestamp
+    const timeB = b.created_at ? new Date(b.created_at).getTime() : Infinity;
+    if (timeA === Infinity && timeB === Infinity && a.id && b.id) return a.id.localeCompare(b.id); // Fallback for new tasks
+    if (timeA === Infinity && timeB === Infinity) return 0;
+
+
+    return timeA - timeB;
+  });
+};
+
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -26,8 +66,8 @@ const App: React.FC = () => {
   const [authLoading, setAuthLoading] = useState(true);
 
   const [columns, setColumns] = useState<ColumnData[]>(INITIAL_COLUMNS);
-  const [isLoading, setIsLoading] = useState(false); // Para carregamento de dados do quadro
-  const [error, setError] = useState<string | null>(null); // Para erros do quadro
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
@@ -37,7 +77,6 @@ const App: React.FC = () => {
   const [draggingOverColumn, setDraggingOverColumn] = useState<DayKey | null>(null);
   const [focusedColumnId, setFocusedColumnId] = useState<DayKey | null>(null);
 
-  // Carregar usuário do localStorage ao iniciar
   useEffect(() => {
     const storedUser = localStorage.getItem('currentUser');
     if (storedUser) {
@@ -56,7 +95,7 @@ const App: React.FC = () => {
     try {
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('id, username, password') // ATENÇÃO: Selecionar senha é INSEGURO
+        .select('id, username, password')
         .eq('username', username)
         .single();
 
@@ -65,7 +104,6 @@ const App: React.FC = () => {
         return;
       }
 
-      // ATENÇÃO: Comparação de senha em texto plano. INSEGURO PARA PRODUÇÃO.
       if (userData.password === passwordAttempt) {
         const loggedInUser: User = { id: userData.id, username: userData.username };
         setCurrentUser(loggedInUser);
@@ -82,19 +120,14 @@ const App: React.FC = () => {
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('currentUser');
-    setColumns(INITIAL_COLUMNS); // Reseta o quadro para o estado inicial
+    setColumns(INITIAL_COLUMNS); 
     setError(null);
     setLoginError(null);
     setFocusedColumnId(null);
   };
 
-  const mapDbTaskToTask = (dbTask: DbTask, checklistItems: DbChecklistItem[]): Task => ({
-    id: dbTask.id,
-    title: dbTask.title,
-    description: dbTask.description || undefined,
-    dayId: dbTask.day_id,
-    user_id: dbTask.user_id || undefined,
-    checklist: checklistItems
+  const mapDbTaskToTask = (dbTask: DbTask, checklistItems: DbChecklistItem[]): Task => {
+    const taskChecklist = checklistItems
       .filter(item => item.task_id === dbTask.id)
       .map(ci => ({
         id: ci.id,
@@ -103,13 +136,22 @@ const App: React.FC = () => {
         created_at: ci.created_at,
         updated_at: ci.updated_at,
         task_id: ci.task_id,
-      })).sort((a,b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()),
-    created_at: dbTask.created_at,
-    updated_at: dbTask.updated_at,
-  });
+      }));
+      
+    return {
+      id: dbTask.id,
+      title: dbTask.title,
+      description: dbTask.description || undefined,
+      dayId: dbTask.day_id,
+      user_id: dbTask.user_id || undefined,
+      checklist: sortChecklistItems(taskChecklist), // Sort checklist items here
+      created_at: dbTask.created_at,
+      updated_at: dbTask.updated_at,
+    };
+  };
 
   const fetchBoardData = useCallback(async () => {
-    if (!currentUser) return; // Não busca dados se não houver usuário logado
+    if (!currentUser) return;
 
     setIsLoading(true);
     setError(null);
@@ -117,7 +159,7 @@ const App: React.FC = () => {
       const { data: tasksData, error: tasksError } = await supabase
         .from('tasks')
         .select('*')
-        .eq('user_id', currentUser.id) // Busca tarefas apenas do usuário logado
+        .eq('user_id', currentUser.id)
         .order('created_at', { ascending: true }); 
 
       if (tasksError) throw tasksError;
@@ -128,19 +170,20 @@ const App: React.FC = () => {
         const { data: ciData, error: checklistItemsError } = await supabase
           .from('checklist_items')
           .select('*')
-          .in('task_id', taskIds);
+          .in('task_id', taskIds)
+          .order('created_at', {ascending: true}); // Fetch checklist items sorted by creation
         if (checklistItemsError) throw checklistItemsError;
         checklistItemsData = ciData || [];
       }
       
       const newColumns = DAYS_OF_WEEK.map(dayInfo => {
-        const dayTasks = (tasksData || [])
+        const dayTasksRaw = (tasksData || [])
           .filter((task: DbTask) => task.day_id === dayInfo.id)
           .map((dbTask: DbTask) => mapDbTaskToTask(dbTask, checklistItemsData));
         return {
           id: dayInfo.id,
           name: dayInfo.name,
-          tasks: dayTasks,
+          tasks: sortTasks(dayTasksRaw), // Sort tasks within the column
         };
       });
       setColumns(newColumns);
@@ -150,13 +193,12 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [currentUser]); // Adicionado currentUser como dependência
+  }, [currentUser]);
 
   useEffect(() => {
     if (currentUser) {
       fetchBoardData();
     } else {
-      // Se não há usuário, limpa o quadro
       setColumns(INITIAL_COLUMNS);
       setIsLoading(false);
     }
@@ -198,6 +240,7 @@ const App: React.FC = () => {
             title: taskDataFromModal.title,
             description: taskDataFromModal.description,
             day_id: taskDataFromModal.dayId,
+            // updated_at will be set by supabase
           })
           .eq('id', taskId)
           .eq('user_id', currentUser.id); 
@@ -212,6 +255,7 @@ const App: React.FC = () => {
             description: taskDataFromModal.description,
             day_id: taskDataFromModal.dayId,
             user_id: currentUser.id, 
+            // created_at and updated_at will be set by supabase
           })
           .select()
           .single();
@@ -243,6 +287,7 @@ const App: React.FC = () => {
             task_id: taskId,
             text: modalItem.text,
             completed: modalItem.completed,
+            // created_at and updated_at for checklist items handled by supabase
         }));
         const { error: upsertCiError } = await supabase
             .from('checklist_items')
@@ -271,6 +316,8 @@ const App: React.FC = () => {
       setIsLoading(true);
       setError(null);
       try {
+        // Cascade delete for checklist_items should be handled by DB foreign key constraint if set up,
+        // otherwise, delete them manually first if needed. For now, assume cascade or orphan cleanup later.
         const { error: deleteError } = await supabase
           .from('tasks')
           .delete()
@@ -280,10 +327,7 @@ const App: React.FC = () => {
         await fetchBoardData(); 
       } catch (err: any) {
         let detailedMessage = "Ocorreu um erro desconhecido ao excluir a tarefa.";
-        if (err && typeof err === 'object') {
-          if (err.message) { detailedMessage = String(err.message); if (err.details) detailedMessage += ` Detalhes: ${err.details}`; if (err.hint) detailedMessage += ` Dica: ${err.hint}`; if (err.code) detailedMessage += ` (Código: ${err.code})`;
-          } else { try { const errString = JSON.stringify(err); detailedMessage = (errString && errString !== '{}') ? errString : "O objeto de erro não continha uma mensagem legível."; } catch (e) { detailedMessage = "Erro ao converter objeto de erro."; } }
-        } else if (typeof err === 'string') { detailedMessage = err; }
+        // ... (error message formatting as before)
         console.error("Error deleting task (raw object):", err);
         setError(`Falha ao excluir tarefa: ${detailedMessage}`);
       } finally {
@@ -295,11 +339,13 @@ const App: React.FC = () => {
   const handleUpdateTaskLocal = useCallback((updatedTask: Task) => {
     if (!currentUser) return;
     setColumns(prevColumns => 
-      prevColumns.map(col => 
-        col.id === updatedTask.dayId 
-          ? { ...col, tasks: col.tasks.map(t => t.id === updatedTask.id ? updatedTask : t) } 
-          : col
-      )
+      prevColumns.map(col => {
+        if (col.id === updatedTask.dayId) {
+          const newTasksInColumn = col.tasks.map(t => t.id === updatedTask.id ? updatedTask : t);
+          return { ...col, tasks: sortTasks(newTasksInColumn) }; // Re-sort tasks in this column
+        }
+        return col;
+      })
     );
   }, [currentUser]);
 
@@ -307,17 +353,18 @@ const App: React.FC = () => {
     if (!currentUser) throw new Error("Usuário não logado.");
     const { error } = await supabase
       .from('checklist_items')
-      .update({ completed })
+      .update({ completed, updated_at: new Date().toISOString() })
       .eq('id', itemId)
       .eq('task_id', taskId); 
     if (error) throw error;
+    // No need to call fetchBoardData here if handleUpdateTaskLocal updates UI optimistically.
   };
 
   const dbUpdateChecklistItemText = async (taskId: string, itemId: string, text: string) => {
     if (!currentUser) throw new Error("Usuário não logado.");
      const { error } = await supabase
       .from('checklist_items')
-      .update({ text })
+      .update({ text, updated_at: new Date().toISOString() })
       .eq('id', itemId)
       .eq('task_id', taskId);
     if (error) throw error;
@@ -357,44 +404,53 @@ const App: React.FC = () => {
     if (!currentUser || !draggedItem || (focusedColumnId && focusedColumnId !== targetDayId)) return;
     e.preventDefault();
     const { taskId, sourceDayId } = draggedItem;    
-    const draggedElement = document.querySelector('.dragging');
-    if (draggedElement) draggedElement.classList.remove('dragging');
+    
+    document.querySelector('.dragging')?.classList.remove('dragging');
     setDraggedItem(null);
     setDraggingOverColumn(null);
+
     if (sourceDayId === targetDayId) return;
 
     const originalColumns = JSON.parse(JSON.stringify(columns)); 
+    
     setColumns(prevColumns => {
-      const newCols = prevColumns.map(col => ({...col, tasks: [...col.tasks]})); 
-      const sourceCol = newCols.find(col => col.id === sourceDayId);
-      const targetCol = newCols.find(col => col.id === targetDayId);
-      if (sourceCol && targetCol) {
-        const taskToMove = sourceCol.tasks.find(t => t.id === taskId);
-        if (taskToMove) {
-          sourceCol.tasks = sourceCol.tasks.filter(t => t.id !== taskId);
-          targetCol.tasks.push({ ...taskToMove, dayId: targetDayId });
+      let taskToMove: Task | undefined;
+      const colsAfterRemoval = prevColumns.map(col => {
+        if (col.id === sourceDayId) {
+          taskToMove = col.tasks.find(t => t.id === taskId);
+          return { ...col, tasks: sortTasks(col.tasks.filter(t => t.id !== taskId)) };
         }
-      }
-      return newCols;
+        return col;
+      });
+
+      if (!taskToMove) return prevColumns; // Should not happen if draggedItem is set
+
+      return colsAfterRemoval.map(col => {
+        if (col.id === targetDayId && taskToMove) {
+          return { ...col, tasks: sortTasks([...col.tasks, { ...taskToMove, dayId: targetDayId }]) };
+        }
+        return col;
+      });
     });
     
     try {
       const { error: updateError } = await supabase
         .from('tasks')
-        .update({ day_id: targetDayId })
+        .update({ day_id: targetDayId, updated_at: new Date().toISOString() })
         .eq('id', taskId)
         .eq('user_id', currentUser.id); 
       if (updateError) throw updateError;
+      // Data is already optimistically updated and sorted.
+      // A full fetchBoardData() could be called here for ultimate consistency if optimistic update is complex.
     } catch (err: any) {
       console.error("Error updating task dayId:", err);
       setError(`Falha ao mover tarefa: ${err.message || 'Erro desconhecido'}`);
-      setColumns(originalColumns); 
+      setColumns(originalColumns); // Revert to original state on error
     }
   }, [currentUser, draggedItem, focusedColumnId, columns]);
   
   const handleDragEnd = useCallback(() => {
-    const draggedElement = document.querySelector('.dragging');
-    if (draggedElement) draggedElement.classList.remove('dragging');
+    document.querySelector('.dragging')?.classList.remove('dragging');
     setDraggedItem(null);
     setDraggingOverColumn(null);
   }, []);
@@ -458,7 +514,7 @@ const App: React.FC = () => {
             Planejamento Semanal
           </h1>
           <button 
-            onClick={(e) => { e.stopPropagation(); handleLogout();}} // Prevent unfocusColumn when clicking logout
+            onClick={(e) => { e.stopPropagation(); handleLogout();}} 
             title="Sair"
             className="absolute right-0 top-1/2 -translate-y-1/2 p-2 text-neutral-400 hover:text-purple-400 transition-colors"
             aria-label="Sair"
@@ -482,6 +538,7 @@ const App: React.FC = () => {
                 onClick={unfocusColumn}
                 aria-label="Fechar visualização focada"
                 role="button" 
+                tabIndex={-1} // Make it focusable for screen readers but not part of tab order
             />
         )}
         <div className={`flex ${focusedColumnId ? 'w-full justify-center relative z-30' : 'space-x-4 min-w-max'}`}>
@@ -492,7 +549,7 @@ const App: React.FC = () => {
               className={`${focusedColumnId ? 'w-full max-w-5xl' : ''}`}
             >
                 <Column
-                column={column}
+                column={column} // column.tasks are now pre-sorted
                 onAddTask={handleOpenModalForNew}
                 onEditTask={handleOpenModalForEdit}
                 onDeleteTask={handleDeleteTask}

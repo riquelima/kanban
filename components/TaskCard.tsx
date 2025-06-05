@@ -11,7 +11,6 @@ interface TaskCardProps {
   onDelete: (taskId: string, dayId: Task['dayId']) => void;
   onUpdateTask: (updatedTask: Task) => void; // Para atualizar estado local síncrono
   onDragStart: (e: React.DragEvent<HTMLDivElement>, taskId: string, sourceDayId: Task['dayId']) => void;
-  // Novas props para interações com DB
   onToggleChecklistItemDB: (taskId: string, itemId: string, completed: boolean) => Promise<void>;
   onUpdateChecklistItemTextDB: (taskId: string, itemId: string, newText: string) => Promise<void>;
   onDeleteChecklistItemDB: (taskId: string, itemId: string) => Promise<void>;
@@ -29,6 +28,20 @@ const TrashIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   </svg>
 );
 
+const sortChecklistItemsInternal = (items: ChecklistItem[]): ChecklistItem[] => {
+  return [...items].sort((a, b) => {
+    if (a.completed !== b.completed) {
+      return a.completed ? 1 : -1; // Uncompleted (false) items first
+    }
+    // If completion status is the same, sort by creation time
+    // Items without created_at (e.g., new client-side items) go last in their group
+    const timeA = a.created_at ? new Date(a.created_at).getTime() : Infinity;
+    const timeB = b.created_at ? new Date(b.created_at).getTime() : Infinity;
+
+    if (timeA === Infinity && timeB === Infinity) return 0; // Keep relative order of new items
+    return timeA - timeB; // Older persisted items first
+  });
+};
 
 const TaskCard: React.FC<TaskCardProps> = ({ 
   task, 
@@ -46,15 +59,19 @@ const TaskCard: React.FC<TaskCardProps> = ({
     if (!itemToToggle) return;
 
     const newCompletedState = !itemToToggle.completed;
+    
+    let updatedChecklist = task.checklist.map(item =>
+      item.id === itemId ? { ...item, completed: newCompletedState } : item
+    );
+    updatedChecklist = sortChecklistItemsInternal(updatedChecklist);
+
     try {
       await onToggleChecklistItemDB(task.id, itemId, newCompletedState);
-      const updatedChecklist = task.checklist.map(item =>
-        item.id === itemId ? { ...item, completed: newCompletedState } : item
-      );
-      onUpdateTask({ ...task, checklist: updatedChecklist }); // Atualiza estado local
+      onUpdateTask({ ...task, checklist: updatedChecklist }); 
     } catch (error) {
       console.error("Failed to toggle checklist item in DB:", error);
-      // Opcional: reverter estado local ou mostrar erro ao usuário
+      // Revert optimistic update if needed (more robust error handling)
+      // For now, local state remains optimistically updated.
     }
   }, [task, onUpdateTask, onToggleChecklistItemDB]);
 
@@ -64,6 +81,8 @@ const TaskCard: React.FC<TaskCardProps> = ({
       const updatedChecklist = task.checklist.map(item =>
         item.id === itemId ? { ...item, text: newText } : item
       );
+      // Text update doesn't change completed status, so existing sort order within groups is maintained.
+      // If it could, re-sorting would be needed: sortChecklistItemsInternal(updatedChecklist)
       onUpdateTask({ ...task, checklist: updatedChecklist });
     } catch (error) {
       console.error("Failed to update checklist item text in DB:", error);
@@ -73,7 +92,9 @@ const TaskCard: React.FC<TaskCardProps> = ({
   const handleDeleteChecklistItem = useCallback(async (itemId: string) => {
     try {
       await onDeleteChecklistItemDB(task.id, itemId);
-      const updatedChecklist = task.checklist.filter(item => item.id !== itemId);
+      let updatedChecklist = task.checklist.filter(item => item.id !== itemId);
+      // No need to re-sort here as relative order of remaining items doesn't change based on deletion itself.
+      // The overall task completion status might change, triggering re-sort of tasks in App.tsx.
       onUpdateTask({ ...task, checklist: updatedChecklist });
     } catch (error) {
       console.error("Failed to delete checklist item from DB:", error);
@@ -87,35 +108,36 @@ const TaskCard: React.FC<TaskCardProps> = ({
 
   const cardBaseClasses = "p-4 rounded-lg shadow-md mb-3 cursor-grab active:cursor-grabbing transition-all duration-150 font-['Roboto_Flex']";
   
-  // Font classes updated to black or dark gray
   const titleClass = "text-black";
-  const descriptionClass = "text-black"; // Can be a slightly lighter dark gray if needed e.g. text-neutral-800
-  const iconClass = "text-black hover:text-purple-500"; // Icon hover remains accent
-  const iconDeleteClass = "text-black hover:text-red-500"; // Delete icon hover remains red
+  const descriptionClass = "text-black"; 
+  const iconClass = "text-black hover:text-purple-500"; 
+  const iconDeleteClass = "text-black hover:text-red-500"; 
   const checklistLabelClass = "text-black";
   const itemTextClass = "text-black";
-  const completedItemTextClass = "text-neutral-700"; // Dark gray for completed (strikethrough) items
+  const completedItemTextClass = "text-neutral-700";
 
-  // Background and progress bar classes remain as before
   const cardNormalStateClasses = `${CARD_BACKGROUND_CLASS} hover:shadow-lg hover:shadow-yellow-500/30`;
-  const progressTrackNormalClass = "bg-yellow-800"; // Darker yellow for progress track
+  const progressTrackNormalClass = "bg-yellow-800"; 
   
   const cardCompletedStateClasses = "bg-emerald-800 border-2 border-emerald-500 hover:shadow-lg hover:shadow-emerald-400/40";
-  const progressTrackCompletedClass = "bg-emerald-900"; // Darker green for progress track on completed
+  const progressTrackCompletedClass = "bg-emerald-900";
+
+  const sortedChecklistForDisplay = sortChecklistItemsInternal(task.checklist);
 
   return (
     <div
       draggable
       onDragStart={(e) => onDragStart(e, task.id, task.dayId)}
       className={`${cardBaseClasses} ${isCompleted ? cardCompletedStateClasses : cardNormalStateClasses}`}
+      aria-label={`Tarefa: ${task.title}, ${isCompleted ? 'Concluída' : 'Pendente'}`}
     >
       <div className="flex justify-between items-start mb-2">
         <h3 className={`font-semibold text-md ${titleClass} break-words`}>{task.title}</h3>
         <div className="flex space-x-1 flex-shrink-0">
-          <IconButton onClick={() => onEdit(task)} ariaLabel="Editar tarefa">
+          <IconButton onClick={() => onEdit(task)} ariaLabel={`Editar tarefa ${task.title}`}>
             <EditIcon className={`w-4 h-4 ${iconClass}`} />
           </IconButton>
-          <IconButton onClick={() => onDelete(task.id, task.dayId)} ariaLabel="Excluir tarefa">
+          <IconButton onClick={() => onDelete(task.id, task.dayId)} ariaLabel={`Excluir tarefa ${task.title}`}>
             <TrashIcon className={`w-4 h-4 ${iconDeleteClass}`} />
           </IconButton>
         </div>
@@ -132,14 +154,14 @@ const TaskCard: React.FC<TaskCardProps> = ({
               Checklist ({completedItems}/{totalItems})
             </span>
           </div>
-          <div className={`w-full ${isCompleted ? progressTrackCompletedClass : progressTrackNormalClass} rounded-full h-1.5 mb-2`}>
+          <div className={`w-full ${isCompleted ? progressTrackCompletedClass : progressTrackNormalClass} rounded-full h-1.5 mb-2`} role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
             <div
               className={`${isCompleted ? 'bg-emerald-400' : 'bg-purple-500'} h-1.5 rounded-full transition-all duration-300 ease-out`}
               style={{ width: `${progress}%` }}
             ></div>
           </div>
           <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
-            {task.checklist.map((item: ChecklistItem) => (
+            {sortedChecklistForDisplay.map((item: ChecklistItem) => (
               <ChecklistItemDisplay
                 key={item.id}
                 item={item}
