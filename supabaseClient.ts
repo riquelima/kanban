@@ -38,3 +38,20 @@ export interface DbChecklistItem {
   updated_at: string;
   // position?: number;
 }
+
+// Novas tipagens para "What's New"
+export interface DbReleaseUpdate {
+  id: string;
+  version_tag: string;
+  title: string;
+  content_html: string;
+  created_at: string;
+}
+
+export interface DbUserUpdateView {
+  id: string;
+  user_id: string;
+  release_update_id: string;
+  login_count_for_update: number;
+  last_seen_at: string;
+}

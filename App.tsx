@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { ColumnData, Task, DayKey, ChecklistItem, User } from './types';
+import { ColumnData, Task, DayKey, ChecklistItem, User, ReleaseUpdate, UserUpdateView } from './types';
 import { INITIAL_COLUMNS, DAYS_OF_WEEK } from './constants';
 import Column from './components/Column';
 import TaskModal from './components/TaskModal';
-import LoginScreen from './components/LoginScreen'; // Importa a tela de Login
-import { supabase, DbTask, DbChecklistItem, DbUser } from './supabaseClient';
+import LoginScreen from './components/LoginScreen';
+import WhatsNewPopup from './components/WhatsNewPopup'; // Importar o novo componente
+import { supabase, DbTask, DbChecklistItem, DbUser, DbReleaseUpdate, DbUserUpdateView } from './supabaseClient';
 
 const CalendarIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
@@ -19,42 +20,36 @@ const LogoutIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   </svg>
 );
 
-// Helper to determine if a task is fully completed
 const isTaskFullyCompleted = (task: Task): boolean => {
   if (!task.checklist || task.checklist.length === 0) {
-    return false; // Task with no checklist items is not considered "completed" by items.
+    return false;
   }
   return task.checklist.every(item => item.completed);
 };
 
-// Helper to sort checklist items
 const sortChecklistItems = (checklist: ChecklistItem[]): ChecklistItem[] => {
   return [...checklist].sort((a, b) => {
     if (a.completed !== b.completed) {
-      return a.completed ? 1 : -1; // Uncompleted (false) items first
+      return a.completed ? 1 : -1;
     }
     const timeA = a.created_at ? new Date(a.created_at).getTime() : Infinity;
     const timeB = b.created_at ? new Date(b.created_at).getTime() : Infinity;
     if (timeA === Infinity && timeB === Infinity) return 0;
-    return timeA - timeB; // Older items first within the same completion group
+    return timeA - timeB;
   });
 };
 
-// Helper to sort tasks
 const sortTasks = (tasks: Task[]): Task[] => {
   return [...tasks].sort((a, b) => {
     const aCompleted = isTaskFullyCompleted(a);
     const bCompleted = isTaskFullyCompleted(b);
     if (aCompleted !== bCompleted) {
-      return aCompleted ? 1 : -1; // Uncompleted tasks first
+      return aCompleted ? 1 : -1;
     }
-    // If completion status is the same, sort by creation time (older first)
-    const timeA = a.created_at ? new Date(a.created_at).getTime() : Infinity; // New tasks last if no timestamp
+    const timeA = a.created_at ? new Date(a.created_at).getTime() : Infinity;
     const timeB = b.created_at ? new Date(b.created_at).getTime() : Infinity;
-    if (timeA === Infinity && timeB === Infinity && a.id && b.id) return a.id.localeCompare(b.id); // Fallback for new tasks
+    if (timeA === Infinity && timeB === Infinity && a.id && b.id) return a.id.localeCompare(b.id);
     if (timeA === Infinity && timeB === Infinity) return 0;
-
-
     return timeA - timeB;
   });
 };
@@ -77,11 +72,17 @@ const App: React.FC = () => {
   const [draggingOverColumn, setDraggingOverColumn] = useState<DayKey | null>(null);
   const [focusedColumnId, setFocusedColumnId] = useState<DayKey | null>(null);
 
+  // State para o popup "What's New"
+  const [isWhatsNewOpen, setIsWhatsNewOpen] = useState(false);
+  const [whatsNewDetails, setWhatsNewDetails] = useState<ReleaseUpdate | null>(null);
+
   useEffect(() => {
     const storedUser = localStorage.getItem('currentUser');
     if (storedUser) {
       try {
-        setCurrentUser(JSON.parse(storedUser));
+        const parsedUser: User = JSON.parse(storedUser);
+        setCurrentUser(parsedUser);
+        // Não verificar "What's New" aqui, apenas no login explícito
       } catch (e) {
         console.error("Error parsing stored user:", e);
         localStorage.removeItem('currentUser');
@@ -89,6 +90,79 @@ const App: React.FC = () => {
     }
     setAuthLoading(false);
   }, []);
+  
+  const checkAndShowWhatsNew = async (user: User) => {
+    try {
+      // 1. Fetch the latest release update
+      const { data: latestUpdateData, error: latestUpdateError } = await supabase
+        .from('release_updates')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single(); // Use .single() as we expect one or zero
+
+      if (latestUpdateError && latestUpdateError.code !== 'PGRST116') { // PGRST116: no rows found
+        console.error("Error fetching latest release update:", latestUpdateError);
+        return;
+      }
+      if (!latestUpdateData) {
+        console.log("No release updates found.");
+        return;
+      }
+      
+      const currentRelease: ReleaseUpdate = latestUpdateData as DbReleaseUpdate;
+
+      // 2. Fetch user's view status for this update
+      const { data: viewData, error: viewError } = await supabase
+        .from('user_update_views')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('release_update_id', currentRelease.id)
+        .single();
+
+      if (viewError && viewError.code !== 'PGRST116') {
+        console.error("Error fetching user update view:", viewError);
+        return;
+      }
+
+      let loginCountForThisUpdate = 0;
+      if (viewData) {
+        loginCountForThisUpdate = (viewData as DbUserUpdateView).login_count_for_update;
+      }
+      
+      // 3. Decide whether to show popup
+      if (loginCountForThisUpdate < 3) {
+        setWhatsNewDetails(currentRelease);
+        setIsWhatsNewOpen(true);
+
+        // 4. Update or insert view count
+        if (viewData) {
+          const { error: updateCountError } = await supabase
+            .from('user_update_views')
+            .update({ 
+              login_count_for_update: loginCountForThisUpdate + 1,
+              last_seen_at: new Date().toISOString()
+            })
+            .eq('id', (viewData as DbUserUpdateView).id);
+          if (updateCountError) console.error("Error updating view count:", updateCountError);
+        } else {
+          const { error: insertCountError } = await supabase
+            .from('user_update_views')
+            .insert({
+              user_id: user.id,
+              release_update_id: currentRelease.id,
+              login_count_for_update: 1, // First view
+              last_seen_at: new Date().toISOString()
+            });
+          if (insertCountError) console.error("Error inserting view count:", insertCountError);
+        }
+      }
+
+    } catch (err) {
+      console.error("Error in checkAndShowWhatsNew:", err);
+    }
+  };
+
 
   const handleLogin = async (username: string, passwordAttempt: string) => {
     setLoginError(null);
@@ -104,10 +178,14 @@ const App: React.FC = () => {
         return;
       }
 
-      if (userData.password === passwordAttempt) {
+      // ATENÇÃO: Comparação de senha em plain text é insegura.
+      // Isso é apenas para fins de demonstração conforme o setup atual.
+      // Em produção, use hashing (ex: Supabase Auth).
+      if (userData.password === passwordAttempt) { 
         const loggedInUser: User = { id: userData.id, username: userData.username };
         setCurrentUser(loggedInUser);
         localStorage.setItem('currentUser', JSON.stringify(loggedInUser));
+        await checkAndShowWhatsNew(loggedInUser); // Chamar a verificação aqui
       } else {
         setLoginError('Senha incorreta.');
       }
@@ -124,6 +202,8 @@ const App: React.FC = () => {
     setError(null);
     setLoginError(null);
     setFocusedColumnId(null);
+    setIsWhatsNewOpen(false); // Fecha o popup de novidades ao sair
+    setWhatsNewDetails(null);
   };
 
   const mapDbTaskToTask = (dbTask: DbTask, checklistItems: DbChecklistItem[]): Task => {
@@ -144,7 +224,7 @@ const App: React.FC = () => {
       description: dbTask.description || undefined,
       dayId: dbTask.day_id,
       user_id: dbTask.user_id || undefined,
-      checklist: sortChecklistItems(taskChecklist), // Sort checklist items here
+      checklist: sortChecklistItems(taskChecklist),
       created_at: dbTask.created_at,
       updated_at: dbTask.updated_at,
     };
@@ -171,7 +251,7 @@ const App: React.FC = () => {
           .from('checklist_items')
           .select('*')
           .in('task_id', taskIds)
-          .order('created_at', {ascending: true}); // Fetch checklist items sorted by creation
+          .order('created_at', {ascending: true});
         if (checklistItemsError) throw checklistItemsError;
         checklistItemsData = ciData || [];
       }
@@ -183,7 +263,7 @@ const App: React.FC = () => {
         return {
           id: dayInfo.id,
           name: dayInfo.name,
-          tasks: sortTasks(dayTasksRaw), // Sort tasks within the column
+          tasks: sortTasks(dayTasksRaw),
         };
       });
       setColumns(newColumns);
@@ -240,7 +320,6 @@ const App: React.FC = () => {
             title: taskDataFromModal.title,
             description: taskDataFromModal.description,
             day_id: taskDataFromModal.dayId,
-            // updated_at will be set by supabase
           })
           .eq('id', taskId)
           .eq('user_id', currentUser.id); 
@@ -255,7 +334,6 @@ const App: React.FC = () => {
             description: taskDataFromModal.description,
             day_id: taskDataFromModal.dayId,
             user_id: currentUser.id, 
-            // created_at and updated_at will be set by supabase
           })
           .select()
           .single();
@@ -287,7 +365,6 @@ const App: React.FC = () => {
             task_id: taskId,
             text: modalItem.text,
             completed: modalItem.completed,
-            // created_at and updated_at for checklist items handled by supabase
         }));
         const { error: upsertCiError } = await supabase
             .from('checklist_items')
@@ -316,8 +393,6 @@ const App: React.FC = () => {
       setIsLoading(true);
       setError(null);
       try {
-        // Cascade delete for checklist_items should be handled by DB foreign key constraint if set up,
-        // otherwise, delete them manually first if needed. For now, assume cascade or orphan cleanup later.
         const { error: deleteError } = await supabase
           .from('tasks')
           .delete()
@@ -327,7 +402,6 @@ const App: React.FC = () => {
         await fetchBoardData(); 
       } catch (err: any) {
         let detailedMessage = "Ocorreu um erro desconhecido ao excluir a tarefa.";
-        // ... (error message formatting as before)
         console.error("Error deleting task (raw object):", err);
         setError(`Falha ao excluir tarefa: ${detailedMessage}`);
       } finally {
@@ -342,7 +416,7 @@ const App: React.FC = () => {
       prevColumns.map(col => {
         if (col.id === updatedTask.dayId) {
           const newTasksInColumn = col.tasks.map(t => t.id === updatedTask.id ? updatedTask : t);
-          return { ...col, tasks: sortTasks(newTasksInColumn) }; // Re-sort tasks in this column
+          return { ...col, tasks: sortTasks(newTasksInColumn) };
         }
         return col;
       })
@@ -357,7 +431,6 @@ const App: React.FC = () => {
       .eq('id', itemId)
       .eq('task_id', taskId); 
     if (error) throw error;
-    // No need to call fetchBoardData here if handleUpdateTaskLocal updates UI optimistically.
   };
 
   const dbUpdateChecklistItemText = async (taskId: string, itemId: string, text: string) => {
@@ -423,7 +496,7 @@ const App: React.FC = () => {
         return col;
       });
 
-      if (!taskToMove) return prevColumns; // Should not happen if draggedItem is set
+      if (!taskToMove) return prevColumns;
 
       return colsAfterRemoval.map(col => {
         if (col.id === targetDayId && taskToMove) {
@@ -440,12 +513,10 @@ const App: React.FC = () => {
         .eq('id', taskId)
         .eq('user_id', currentUser.id); 
       if (updateError) throw updateError;
-      // Data is already optimistically updated and sorted.
-      // A full fetchBoardData() could be called here for ultimate consistency if optimistic update is complex.
     } catch (err: any) {
       console.error("Error updating task dayId:", err);
       setError(`Falha ao mover tarefa: ${err.message || 'Erro desconhecido'}`);
-      setColumns(originalColumns); // Revert to original state on error
+      setColumns(originalColumns);
     }
   }, [currentUser, draggedItem, focusedColumnId, columns]);
   
@@ -538,7 +609,7 @@ const App: React.FC = () => {
                 onClick={unfocusColumn}
                 aria-label="Fechar visualização focada"
                 role="button" 
-                tabIndex={-1} // Make it focusable for screen readers but not part of tab order
+                tabIndex={-1}
             />
         )}
         <div className={`flex ${focusedColumnId ? 'w-full justify-center relative z-30' : 'space-x-4 min-w-max'}`}>
@@ -549,7 +620,7 @@ const App: React.FC = () => {
               className={`${focusedColumnId ? 'w-full max-w-5xl' : ''}`}
             >
                 <Column
-                column={column} // column.tasks are now pre-sorted
+                column={column}
                 onAddTask={handleOpenModalForNew}
                 onEditTask={handleOpenModalForEdit}
                 onDeleteTask={handleDeleteTask}
@@ -576,6 +647,16 @@ const App: React.FC = () => {
         taskToEdit={taskToEdit}
         defaultDayId={defaultDayForNewTask}
       />
+
+      {whatsNewDetails && (
+        <WhatsNewPopup
+          isOpen={isWhatsNewOpen}
+          onClose={() => setIsWhatsNewOpen(false)}
+          title={whatsNewDetails.title}
+          contentHtml={whatsNewDetails.content_html}
+        />
+      )}
+
       <footer className="text-center text-sm text-neutral-600 mt-8 py-4 border-t border-neutral-800">
         Dados armazenados com <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:underline">Supabase</a>.
       </footer>

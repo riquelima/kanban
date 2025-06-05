@@ -34,9 +34,24 @@ export interface ColumnData {
   tasks: Task[];
 }
 
-// Novo tipo para o usuário logado
 export interface User {
   id: string; // UUID do usuário no Supabase
   username: string;
-  // Outras informações do usuário que você pode querer armazenar no estado
+}
+
+// Tipos para a funcionalidade "What's New"
+export interface ReleaseUpdate {
+  id: string;
+  version_tag: string;
+  title: string;
+  content_html: string; // Conteúdo em HTML para o popup
+  created_at: string;
+}
+
+export interface UserUpdateView {
+  id?: string;
+  user_id: string;
+  release_update_id: string;
+  login_count_for_update: number;
+  last_seen_at?: string;
 }
