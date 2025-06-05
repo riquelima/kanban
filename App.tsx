@@ -198,12 +198,9 @@ const App: React.FC = () => {
             title: taskDataFromModal.title,
             description: taskDataFromModal.description,
             day_id: taskDataFromModal.dayId,
-            // user_id não precisa ser atualizado aqui se a task já pertence ao usuário
-            // mas é bom garantir que não seja mudado para outro usuário inadvertidamente.
-            // A RLS deve proteger contra isso de qualquer forma.
           })
           .eq('id', taskId)
-          .eq('user_id', currentUser.id); // Segurança adicional
+          .eq('user_id', currentUser.id); 
         if (taskUpdateError) throw taskUpdateError;
 
       } else { 
@@ -214,7 +211,7 @@ const App: React.FC = () => {
             title: taskDataFromModal.title,
             description: taskDataFromModal.description,
             day_id: taskDataFromModal.dayId,
-            user_id: currentUser.id, // Associa a nova task ao usuário logado
+            user_id: currentUser.id, 
           })
           .select()
           .single();
@@ -278,7 +275,7 @@ const App: React.FC = () => {
           .from('tasks')
           .delete()
           .eq('id', taskId)
-          .eq('user_id', currentUser.id); // Garante que só pode deletar suas tasks
+          .eq('user_id', currentUser.id); 
         if (deleteError) throw deleteError;
         await fetchBoardData(); 
       } catch (err: any) {
@@ -386,7 +383,7 @@ const App: React.FC = () => {
         .from('tasks')
         .update({ day_id: targetDayId })
         .eq('id', taskId)
-        .eq('user_id', currentUser.id); // Segurança
+        .eq('user_id', currentUser.id); 
       if (updateError) throw updateError;
     } catch (err: any) {
       console.error("Error updating task dayId:", err);
@@ -406,6 +403,11 @@ const App: React.FC = () => {
     setFocusedColumnId(prevFocusedId => (prevFocusedId === dayId ? null : dayId));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
+
+  const unfocusColumn = useCallback(() => {
+    setFocusedColumnId(null);
+  }, []);
+
 
   if (authLoading) {
     return <div className="min-h-screen flex items-center justify-center text-xl text-neutral-300 bg-gray-950">Verificando sessão...</div>;
@@ -446,13 +448,17 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col p-4 bg-gray-950 selection:bg-purple-500 selection:text-white" onDragEnd={handleDragEnd}>
       <header className="mb-8 text-center">
-        <div className="flex items-center justify-center space-x-3 relative">
+        <div 
+          className={`flex items-center justify-center space-x-3 relative ${focusedColumnId ? 'cursor-pointer' : ''}`}
+          onClick={focusedColumnId ? unfocusColumn : undefined}
+          title={focusedColumnId ? "Voltar ao dashboard (Clique para desfocar)" : ""}
+        >
           <CalendarIcon className="w-10 h-10 text-purple-400" />
           <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-rose-400 font-['Sigmar_One']">
             Planejamento Semanal
           </h1>
           <button 
-            onClick={handleLogout} 
+            onClick={(e) => { e.stopPropagation(); handleLogout();}} // Prevent unfocusColumn when clicking logout
             title="Sair"
             className="absolute right-0 top-1/2 -translate-y-1/2 p-2 text-neutral-400 hover:text-purple-400 transition-colors"
             aria-label="Sair"
@@ -460,13 +466,25 @@ const App: React.FC = () => {
             <LogoutIcon className="w-7 h-7" />
           </button>
         </div>
-        <p className="text-neutral-400 mt-2">
+        <p 
+          className={`text-neutral-400 mt-2 ${focusedColumnId ? 'cursor-pointer' : ''}`}
+          onClick={focusedColumnId ? unfocusColumn : undefined}
+          title={focusedColumnId ? "Voltar ao dashboard (Clique para desfocar)" : ""}
+        >
           Usuário: <span className="font-semibold text-purple-300">{currentUser.username}</span>. Organize suas tarefas da semana.
         </p>
       </header>
-
-      <main className={`flex-grow ${focusedColumnId ? 'w-full' : 'overflow-x-auto'} pb-4`}>
-        <div className={`flex ${focusedColumnId ? 'w-full justify-center' : 'space-x-4 min-w-max'}`}>
+      
+      <main className={`flex-grow ${focusedColumnId ? 'w-full relative' : 'overflow-x-auto'} pb-4`}>
+        {focusedColumnId && (
+            <div
+                className="fixed inset-0 bg-black bg-opacity-60 z-20 transition-opacity duration-300 ease-in-out"
+                onClick={unfocusColumn}
+                aria-label="Fechar visualização focada"
+                role="button" 
+            />
+        )}
+        <div className={`flex ${focusedColumnId ? 'w-full justify-center relative z-30' : 'space-x-4 min-w-max'}`}>
           {displayedColumns.map(column => (
             <div 
               key={column.id} 
