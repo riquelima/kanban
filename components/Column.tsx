@@ -53,7 +53,7 @@ const Column: React.FC<ColumnProps> = ({
     >
       <div className="flex justify-between items-center mb-4 p-3 sticky top-0 bg-neutral-900 z-10 rounded-t-xl">
         <h2 
-          className={`font-semibold text-lg ${ACCENT_TEXT_COLOR_CLASS} ${!isFocused ? 'cursor-pointer hover:underline' : ''}`}
+          className={`font-semibold text-xl ${ACCENT_TEXT_COLOR_CLASS} ${!isFocused ? 'cursor-pointer hover:underline' : ''}`}
           onClick={() => onToggleFocus(column.id)}
           title={isFocused ? `Mostrar todos os dias` : `Focar em ${column.name}`}
         >

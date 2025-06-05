@@ -12,7 +12,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Tipagem para os dados que vêm do Supabase (opcional, mas ajuda)
+// Tipagem para os dados que vêm do Supabase
+export interface DbUser {
+  id: string; // UUID
+  username: string;
+  // password não deve ser selecionado/retornado para o cliente
+  created_at: string;
+}
 export interface DbTask {
   id: string; // UUID
   title: string;
@@ -20,7 +26,7 @@ export interface DbTask {
   day_id: DayKey; // Armazenará "MONDAY", "TUESDAY", etc.
   created_at: string;
   updated_at: string;
-  // user_id?: string | null;
+  user_id?: string | null; // Adicionado para associar tarefas a usuários
 }
 
 export interface DbChecklistItem {

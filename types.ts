@@ -15,6 +15,7 @@ export interface Task {
   dayId: DayKey; // Mapeia para tasks.day_id no Supabase
   created_at?: string;
   updated_at?: string;
+  user_id?: string; // Para associar tarefas a usuários no frontend
 }
 
 export enum DayKey {
@@ -31,4 +32,11 @@ export interface ColumnData {
   id: DayKey;
   name: string;
   tasks: Task[];
+}
+
+// Novo tipo para o usuário logado
+export interface User {
+  id: string; // UUID do usuário no Supabase
+  username: string;
+  // Outras informações do usuário que você pode querer armazenar no estado
 }

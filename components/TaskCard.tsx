@@ -1,3 +1,4 @@
+
 import React, { useCallback } from 'react';
 import { Task, ChecklistItem } from '../types';
 import ChecklistItemDisplay from './ChecklistItemDisplay';
@@ -84,28 +85,23 @@ const TaskCard: React.FC<TaskCardProps> = ({
   const progress = totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
   const isCompleted = totalItems > 0 && completedItems === totalItems;
 
-  const cardBaseClasses = "p-4 rounded-lg shadow-md mb-3 cursor-grab active:cursor-grabbing transition-all duration-150";
+  const cardBaseClasses = "p-4 rounded-lg shadow-md mb-3 cursor-grab active:cursor-grabbing transition-all duration-150 font-['Roboto_Flex']";
   
+  // Font classes updated to black or dark gray
+  const titleClass = "text-black";
+  const descriptionClass = "text-black"; // Can be a slightly lighter dark gray if needed e.g. text-neutral-800
+  const iconClass = "text-black hover:text-purple-500"; // Icon hover remains accent
+  const iconDeleteClass = "text-black hover:text-red-500"; // Delete icon hover remains red
+  const checklistLabelClass = "text-black";
+  const itemTextClass = "text-black";
+  const completedItemTextClass = "text-neutral-700"; // Dark gray for completed (strikethrough) items
+
+  // Background and progress bar classes remain as before
   const cardNormalStateClasses = `${CARD_BACKGROUND_CLASS} hover:shadow-lg hover:shadow-yellow-500/30`;
-  const titleNormalClass = "text-yellow-50";
-  const descriptionNormalClass = "text-yellow-200";
-  const iconNormalClass = "text-yellow-300 hover:text-purple-400";
-  const iconDeleteNormalHoverClass = "text-yellow-300 hover:text-red-400";
-  const checklistLabelNormalClass = "text-yellow-200";
-  const progressTrackNormalClass = "bg-yellow-800";
-  const itemTextNormalClass = "text-yellow-50";
-  const completedItemTextNormalClass = "text-yellow-400";
-
+  const progressTrackNormalClass = "bg-yellow-800"; // Darker yellow for progress track
+  
   const cardCompletedStateClasses = "bg-emerald-800 border-2 border-emerald-500 hover:shadow-lg hover:shadow-emerald-400/40";
-  const titleCompletedClass = "text-emerald-50";
-  const descriptionCompletedClass = "text-emerald-200";
-  const iconCompletedClass = "text-emerald-300 hover:text-emerald-100";
-  const iconDeleteCompletedHoverClass = "text-emerald-300 hover:text-red-400";
-  const checklistLabelCompletedClass = "text-emerald-200";
-  const progressTrackCompletedClass = "bg-emerald-700";
-  const itemTextCompletedClass = "text-emerald-100";
-  const completedItemTextCompletedClass = "text-emerald-400";
-
+  const progressTrackCompletedClass = "bg-emerald-900"; // Darker green for progress track on completed
 
   return (
     <div
@@ -114,25 +110,25 @@ const TaskCard: React.FC<TaskCardProps> = ({
       className={`${cardBaseClasses} ${isCompleted ? cardCompletedStateClasses : cardNormalStateClasses}`}
     >
       <div className="flex justify-between items-start mb-2">
-        <h3 className={`font-semibold text-md ${isCompleted ? titleCompletedClass : titleNormalClass} break-words`}>{task.title}</h3>
+        <h3 className={`font-semibold text-md ${titleClass} break-words`}>{task.title}</h3>
         <div className="flex space-x-1 flex-shrink-0">
           <IconButton onClick={() => onEdit(task)} ariaLabel="Editar tarefa">
-            <EditIcon className={`w-4 h-4 ${isCompleted ? iconCompletedClass : iconNormalClass}`} />
+            <EditIcon className={`w-4 h-4 ${iconClass}`} />
           </IconButton>
           <IconButton onClick={() => onDelete(task.id, task.dayId)} ariaLabel="Excluir tarefa">
-            <TrashIcon className={`w-4 h-4 ${isCompleted ? iconDeleteCompletedHoverClass : iconDeleteNormalHoverClass}`} />
+            <TrashIcon className={`w-4 h-4 ${iconDeleteClass}`} />
           </IconButton>
         </div>
       </div>
 
       {task.description && (
-        <p className={`text-sm ${isCompleted ? descriptionCompletedClass : descriptionNormalClass} mb-3 break-words`}>{task.description}</p>
+        <p className={`text-sm ${descriptionClass} mb-3 break-words`}>{task.description}</p>
       )}
 
       {task.checklist && task.checklist.length > 0 && (
         <div className="mb-3">
           <div className="flex justify-between items-center mb-1">
-            <span className={`text-xs font-medium ${isCompleted ? checklistLabelCompletedClass : checklistLabelNormalClass}`}>
+            <span className={`text-xs font-medium ${checklistLabelClass}`}>
               Checklist ({completedItems}/{totalItems})
             </span>
           </div>
@@ -150,8 +146,8 @@ const TaskCard: React.FC<TaskCardProps> = ({
                 onToggle={handleToggleChecklistItem}
                 onUpdateText={handleUpdateChecklistItemText}
                 onDelete={handleDeleteChecklistItem}
-                itemTextColorClass={isCompleted ? itemTextCompletedClass : itemTextNormalClass}
-                completedTextColorClass={isCompleted ? completedItemTextCompletedClass : completedItemTextNormalClass}
+                itemTextColorClass={itemTextClass}
+                completedTextColorClass={completedItemTextClass}
               />
             ))}
           </div>
