@@ -1,25 +1,34 @@
-
-export type DayOfWeekId = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
-
-export interface ChecklistItemType {
-  id: string;
+export interface ChecklistItem {
+  id: string; // UUID gerado pelo cliente ou Supabase
   text: string;
   completed: boolean;
+  task_id?: string; // Para associar ao criar/atualizar no Supabase
+  created_at?: string;
+  updated_at?: string;
 }
 
-export interface TaskCardType {
-  id: string;
-  name: string;
-  checklist: ChecklistItemType[];
-}
-
-export interface DayColumnType {
-  id: DayOfWeekId;
+export interface Task {
+  id: string; // UUID gerado pelo cliente ou Supabase
   title: string;
-  tasks: TaskCardType[];
+  description?: string;
+  checklist: ChecklistItem[];
+  dayId: DayKey; // Mapeia para tasks.day_id no Supabase
+  created_at?: string;
+  updated_at?: string;
 }
 
-export interface EditingTaskDetails {
-  dayId: DayOfWeekId;
-  task: TaskCardType;
+export enum DayKey {
+  MONDAY = "MONDAY",
+  TUESDAY = "TUESDAY",
+  WEDNESDAY = "WEDNESDAY",
+  THURSDAY = "THURSDAY",
+  FRIDAY = "FRIDAY",
+  SATURDAY = "SATURDAY",
+  SUNDAY = "SUNDAY",
+}
+
+export interface ColumnData {
+  id: DayKey;
+  name: string;
+  tasks: Task[];
 }

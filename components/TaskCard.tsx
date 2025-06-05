@@ -1,70 +1,162 @@
-
-import React from 'react';
-import { TaskCardType, DayOfWeekId } from '../types';
-import TrashIcon from './icons/TrashIcon';
-import CheckIcon from './icons/CheckIcon';
+import React, { useCallback } from 'react';
+import { Task, ChecklistItem } from '../types';
+import ChecklistItemDisplay from './ChecklistItemDisplay';
+import IconButton from './IconButton';
+import { CARD_BACKGROUND_CLASS } from '../constants'; // CARD_BACKGROUND_CLASS is now yellow-700
 
 interface TaskCardProps {
-  task: TaskCardType;
-  dayId: DayOfWeekId;
-  onOpenChecklist: (dayId: DayOfWeekId, task: TaskCardType) => void;
-  onDeleteTask: (dayId: DayOfWeekId, taskId: string) => void;
-  // isDragging?: boolean; // Optional: if you want to change style while dragging
+  task: Task;
+  onEdit: (task: Task) => void;
+  onDelete: (taskId: string, dayId: Task['dayId']) => void;
+  onUpdateTask: (updatedTask: Task) => void; // Para atualizar estado local síncrono
+  onDragStart: (e: React.DragEvent<HTMLDivElement>, taskId: string, sourceDayId: Task['dayId']) => void;
+  // Novas props para interações com DB
+  onToggleChecklistItemDB: (taskId: string, itemId: string, completed: boolean) => Promise<void>;
+  onUpdateChecklistItemTextDB: (taskId: string, itemId: string, newText: string) => Promise<void>;
+  onDeleteChecklistItemDB: (taskId: string, itemId: string) => Promise<void>;
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, dayId, onOpenChecklist, onDeleteTask /*, isDragging */ }) => {
-  const isCompleted = task.checklist.length > 0 && task.checklist.every(item => item.completed);
-  
-  const cardBaseStyles = "p-3 my-2 rounded-lg shadow-md border cursor-pointer transition-all duration-150 ease-in-out";
-  const pendingCardColors = "bg-yellow-400 hover:bg-yellow-500 border-yellow-500 text-yellow-900";
-  const completedCardColors = "bg-green-600 hover:bg-green-700 border-green-700 text-green-100";
-  
-  // let cardDynamicStyles = isDragging ? "opacity-75 shadow-2xl scale-105" : ""; // Example dragging style
-  
-  const cardStyles = `${cardBaseStyles} ${isCompleted ? completedCardColors : pendingCardColors}`;
-  const taskNameColor = isCompleted ? "text-green-50" : "text-yellow-950"; // Darker yellow text for better contrast
-  const checklistStatusColor = isCompleted ? "text-green-200" : "text-yellow-800";
-  const noChecklistTextColor = "text-yellow-700 opacity-80";
+const EditIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+  </svg>
+);
 
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation(); 
-    onDeleteTask(dayId, task.id);
-  };
+const TrashIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12.56 0c.342.052.682.107 1.022.166m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+  </svg>
+);
+
+
+const TaskCard: React.FC<TaskCardProps> = ({ 
+  task, 
+  onEdit, 
+  onDelete, 
+  onUpdateTask, 
+  onDragStart,
+  onToggleChecklistItemDB,
+  onUpdateChecklistItemTextDB,
+  onDeleteChecklistItemDB,
+}) => {
   
+  const handleToggleChecklistItem = useCallback(async (itemId: string) => {
+    const itemToToggle = task.checklist.find(item => item.id === itemId);
+    if (!itemToToggle) return;
+
+    const newCompletedState = !itemToToggle.completed;
+    try {
+      await onToggleChecklistItemDB(task.id, itemId, newCompletedState);
+      const updatedChecklist = task.checklist.map(item =>
+        item.id === itemId ? { ...item, completed: newCompletedState } : item
+      );
+      onUpdateTask({ ...task, checklist: updatedChecklist }); // Atualiza estado local
+    } catch (error) {
+      console.error("Failed to toggle checklist item in DB:", error);
+      // Opcional: reverter estado local ou mostrar erro ao usuário
+    }
+  }, [task, onUpdateTask, onToggleChecklistItemDB]);
+
+  const handleUpdateChecklistItemText = useCallback(async (itemId: string, newText: string) => {
+    try {
+      await onUpdateChecklistItemTextDB(task.id, itemId, newText);
+      const updatedChecklist = task.checklist.map(item =>
+        item.id === itemId ? { ...item, text: newText } : item
+      );
+      onUpdateTask({ ...task, checklist: updatedChecklist });
+    } catch (error) {
+      console.error("Failed to update checklist item text in DB:", error);
+    }
+  },[task, onUpdateTask, onUpdateChecklistItemTextDB]);
+  
+  const handleDeleteChecklistItem = useCallback(async (itemId: string) => {
+    try {
+      await onDeleteChecklistItemDB(task.id, itemId);
+      const updatedChecklist = task.checklist.filter(item => item.id !== itemId);
+      onUpdateTask({ ...task, checklist: updatedChecklist });
+    } catch (error) {
+      console.error("Failed to delete checklist item from DB:", error);
+    }
+  }, [task, onUpdateTask, onDeleteChecklistItemDB]);
+
   const completedItems = task.checklist.filter(item => item.completed).length;
   const totalItems = task.checklist.length;
+  const progress = totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
+  const isCompleted = totalItems > 0 && completedItems === totalItems;
+
+  const cardBaseClasses = "p-4 rounded-lg shadow-md mb-3 cursor-grab active:cursor-grabbing transition-all duration-150";
+  
+  const cardNormalStateClasses = `${CARD_BACKGROUND_CLASS} hover:shadow-lg hover:shadow-yellow-500/30`;
+  const titleNormalClass = "text-yellow-50";
+  const descriptionNormalClass = "text-yellow-200";
+  const iconNormalClass = "text-yellow-300 hover:text-purple-400";
+  const iconDeleteNormalHoverClass = "text-yellow-300 hover:text-red-400";
+  const checklistLabelNormalClass = "text-yellow-200";
+  const progressTrackNormalClass = "bg-yellow-800";
+  const itemTextNormalClass = "text-yellow-50";
+  const completedItemTextNormalClass = "text-yellow-400";
+
+  const cardCompletedStateClasses = "bg-emerald-800 border-2 border-emerald-500 hover:shadow-lg hover:shadow-emerald-400/40";
+  const titleCompletedClass = "text-emerald-50";
+  const descriptionCompletedClass = "text-emerald-200";
+  const iconCompletedClass = "text-emerald-300 hover:text-emerald-100";
+  const iconDeleteCompletedHoverClass = "text-emerald-300 hover:text-red-400";
+  const checklistLabelCompletedClass = "text-emerald-200";
+  const progressTrackCompletedClass = "bg-emerald-700";
+  const itemTextCompletedClass = "text-emerald-100";
+  const completedItemTextCompletedClass = "text-emerald-400";
+
 
   return (
     <div
-      className={cardStyles}
-      onClick={() => onOpenChecklist(dayId, task)}
-      aria-label={`Task: ${task.name}, status: ${isCompleted ? 'completed' : 'pending'}`}
+      draggable
+      onDragStart={(e) => onDragStart(e, task.id, task.dayId)}
+      className={`${cardBaseClasses} ${isCompleted ? cardCompletedStateClasses : cardNormalStateClasses}`}
     >
-      <div className="flex justify-between items-start">
-        <h4 className={`font-semibold text-md break-words ${taskNameColor}`}>{task.name}</h4>
-        <button
-          onClick={handleDelete}
-          className="text-red-300 hover:text-red-200 p-1 rounded-full hover:bg-red-700 hover:bg-opacity-50 transition-colors opacity-75 hover:opacity-100"
-          aria-label="Delete task"
-        >
-          <TrashIcon className="w-4 h-4" />
-        </button>
+      <div className="flex justify-between items-start mb-2">
+        <h3 className={`font-semibold text-md ${isCompleted ? titleCompletedClass : titleNormalClass} break-words`}>{task.title}</h3>
+        <div className="flex space-x-1 flex-shrink-0">
+          <IconButton onClick={() => onEdit(task)} ariaLabel="Editar tarefa">
+            <EditIcon className={`w-4 h-4 ${isCompleted ? iconCompletedClass : iconNormalClass}`} />
+          </IconButton>
+          <IconButton onClick={() => onDelete(task.id, task.dayId)} ariaLabel="Excluir tarefa">
+            <TrashIcon className={`w-4 h-4 ${isCompleted ? iconDeleteCompletedHoverClass : iconDeleteNormalHoverClass}`} />
+          </IconButton>
+        </div>
       </div>
-      {(totalItems > 0 || isCompleted) && (
-         <div className={`mt-2 flex items-center text-xs ${checklistStatusColor}`}>
-          {isCompleted ? (
-            <CheckIcon className="w-4 h-4 text-green-300 mr-1" />
-          ) : (
-            <div className={`w-3 h-3 border ${isCompleted ? 'border-green-400' : 'border-yellow-700'} rounded-full mr-1.5`}></div>
-          )}
-          <span>
-            {completedItems}/{totalItems} concluído{totalItems !== 1 ? 's' : ''}
-          </span>
+
+      {task.description && (
+        <p className={`text-sm ${isCompleted ? descriptionCompletedClass : descriptionNormalClass} mb-3 break-words`}>{task.description}</p>
+      )}
+
+      {task.checklist && task.checklist.length > 0 && (
+        <div className="mb-3">
+          <div className="flex justify-between items-center mb-1">
+            <span className={`text-xs font-medium ${isCompleted ? checklistLabelCompletedClass : checklistLabelNormalClass}`}>
+              Checklist ({completedItems}/{totalItems})
+            </span>
+          </div>
+          <div className={`w-full ${isCompleted ? progressTrackCompletedClass : progressTrackNormalClass} rounded-full h-1.5 mb-2`}>
+            <div
+              className={`${isCompleted ? 'bg-emerald-400' : 'bg-purple-500'} h-1.5 rounded-full transition-all duration-300 ease-out`}
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
+          <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
+            {task.checklist.map((item: ChecklistItem) => (
+              <ChecklistItemDisplay
+                key={item.id}
+                item={item}
+                onToggle={handleToggleChecklistItem}
+                onUpdateText={handleUpdateChecklistItemText}
+                onDelete={handleDeleteChecklistItem}
+                itemTextColorClass={isCompleted ? itemTextCompletedClass : itemTextNormalClass}
+                completedTextColorClass={isCompleted ? completedItemTextCompletedClass : completedItemTextNormalClass}
+              />
+            ))}
+          </div>
         </div>
       )}
-       {task.checklist.length === 0 && !isCompleted && (
-         <p className={`text-xs mt-1 ${noChecklistTextColor}`}>Sem checklist. Clique para adicionar.</p>
-       )}
     </div>
   );
 };

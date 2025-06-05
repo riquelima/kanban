@@ -1,53 +1,58 @@
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kanban Trello</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Planejamento Semanal</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Sigmar+One&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    /* Custom scrollbar for webkit browsers - Dark Theme */
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #1E1E1E; /* Cinza bem escuro */
+      color: #E0E0E0; /* Cor de texto padrão para dark mode */
+    }
+    /* Custom scrollbar for webkit browsers */
     ::-webkit-scrollbar {
       width: 8px;
       height: 8px;
     }
     ::-webkit-scrollbar-track {
-      background: #1a202c; /* Tailwind gray-900 */
+      background: #2D2D2D;
       border-radius: 10px;
     }
     ::-webkit-scrollbar-thumb {
-      background: #4a5568; /* Tailwind gray-700 */
+      background: #555;
       border-radius: 10px;
     }
     ::-webkit-scrollbar-thumb:hover {
-      background: #718096; /* Tailwind gray-600 */
+      background: #8B5CF6; /* Roxo Neon */
     }
-    body {
-      overscroll-behavior-x: none; /* Prevents pull-to-refresh on horizontal scroll */
+    .dragging {
+      opacity: 0.5;
+      transform: rotate(3deg);
     }
-    /* Apply Sigmar One using a utility class if preferred, or directly in components */
-    .font-sigmar-one {
-      font-family: 'Sigmar One', cursive;
+    .drag-over {
+      border: 2px dashed #8B5CF6; /* Roxo Neon */
+      background-color: rgba(139, 92, 246, 0.1);
     }
   </style>
 <script type="importmap">
 {
   "imports": {
+    "react/": "https://esm.sh/react@^19.1.0/",
     "react": "https://esm.sh/react@^19.1.0",
-    "react-dom/client": "https://esm.sh/react-dom@^19.1.0/client",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.44.4",
     "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
-    "react/": "https://esm.sh/react@^19.1.0/"
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.49.10"
   }
 }
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
-<body class="bg-gray-900 text-gray-200">
+<body>
   <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>

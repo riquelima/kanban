@@ -1,5 +1,5 @@
 {
-  "name": "kanban.v1",
+  "name": "copy---planejamento-semanal",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -10,9 +10,8 @@
   },
   "dependencies": {
     "react": "^19.1.0",
-    "react-dom/client": "^19.1.0",
-    "@supabase/supabase-js": "^2.44.4",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "@supabase/supabase-js": "^2.49.10"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

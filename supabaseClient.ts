@@ -1,39 +1,34 @@
 import { createClient } from '@supabase/supabase-js';
-import { DayOfWeekId, TaskCardType as AppTaskCardType, ChecklistItemType as AppChecklistItemType } from './types';
+import { DayKey } from './types'; // Import DayKey
 
-// Provided Supabase URL and Anon Key
-const supabaseUrl = 'https://pobqcwcxspweujyssmrs.supabase.co';
+// ATENÇÃO: É uma melhor prática armazenar estas credenciais em variáveis de ambiente.
+// No entanto, seguindo a solicitação, elas estão hardcoded aqui.
+const supabaseUrl = 'https://pobqcwcxspweujyssmrs.supabase.co'; // Corrigido da URL do dashboard
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBvYnFjd2N4c3B3ZXVqeXNzbXJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkxMzEzNTIsImV4cCI6MjA2NDcwNzM1Mn0.oN9k5gz7rWtoCjLn152inBzMNjwgvY5NJ89I4zSdDnM';
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error("Supabase URL or Anon Key is missing. Please check your environment variables or configuration.");
+  throw new Error("Supabase URL and Anon Key are required.");
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Define interfaces for Supabase table rows to ensure type safety
-// These might be slightly different from your app types (e.g., column names like day_id)
-
-export interface SupabaseDay {
-  id: DayOfWeekId; // 'monday', 'tuesday', etc.
+// Tipagem para os dados que vêm do Supabase (opcional, mas ajuda)
+export interface DbTask {
+  id: string; // UUID
   title: string;
-  created_at: string;
-}
-
-export interface SupabaseTask {
-  id: string; // UUID from Supabase
-  day_id: DayOfWeekId;
-  name: string;
+  description?: string | null;
+  day_id: DayKey; // Armazenará "MONDAY", "TUESDAY", etc.
   created_at: string;
   updated_at: string;
-  //checklist?: AppChecklistItemType[]; // This will be populated by joining/fetching separately
+  // user_id?: string | null;
 }
 
-export interface SupabaseChecklistItem {
-  id: string; // UUID from Supabase
-  task_id: string; // Foreign key to tasks.id
+export interface DbChecklistItem {
+  id: string; // UUID
+  task_id: string; // Foreign key para tasks.id
   text: string;
   completed: boolean;
   created_at: string;
   updated_at: string;
+  // position?: number;
 }
