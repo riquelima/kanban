@@ -1,0 +1,5 @@
+{
+  "name": "Kanban.v1",
+  "description": "A Kanban-style task management application with 7 columns for days of the week, allowing users to add tasks and manage checklists for each task.",
+  "requestFramePermissions": []
+}
