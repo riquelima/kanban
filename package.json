@@ -12,8 +12,7 @@
     "react": "^19.1.0",
     "react-dom/client": "^19.1.0",
     "@supabase/supabase-js": "^2.44.4",
-    "react-dom": "^19.1.0",
-    "@hello-pangea/dnd": "^18.0.1"
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
