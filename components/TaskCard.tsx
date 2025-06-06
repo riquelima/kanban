@@ -11,6 +11,7 @@ interface TaskCardProps {
   onDelete: (taskId: string, stageId: StageKey) => void;
   onUpdateTask: (updatedTask: Task) => void; 
   onDragStart: (e: React.DragEvent<HTMLDivElement>, taskId: string, sourceStageId: StageKey) => void;
+  onToggleChecklistItem: (taskId: string, itemId: string, completed: boolean) => Promise<void>; // Added prop
 }
 
 const EditIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
@@ -25,7 +26,7 @@ const TrashIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   </svg>
 );
 
-// AssigneeAvatar and ChatBubbleOvalLeftEllipsisIcon are removed as they are no longer used in this file.
+const MAX_CHECKLIST_ITEMS_ON_CARD = 3;
 
 const TaskCard: React.FC<TaskCardProps> = ({ 
   task, 
@@ -33,9 +34,19 @@ const TaskCard: React.FC<TaskCardProps> = ({
   onEdit, 
   onDelete, 
   onDragStart,
+  onToggleChecklistItem, // Destructure new prop
 }) => {
   
   const priorityInfo = (task.priority && PRIORITY_STYLES[task.priority]) ? PRIORITY_STYLES[task.priority] : PRIORITY_STYLES["Default"];
+
+  const completedChecklistItems = task.checklist.filter(item => item.completed).length;
+  const totalChecklistItems = task.checklist.length;
+
+  const handleChecklistItemToggle = useCallback((e: React.MouseEvent, itemId: string, currentCompletedState: boolean) => {
+    e.stopPropagation(); // Prevent card click (edit modal)
+    onToggleChecklistItem(task.id, itemId, !currentCompletedState);
+  }, [task.id, onToggleChecklistItem]);
+
 
   return (
     <div
@@ -61,7 +72,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
         </div>
       </div>
 
-      <h3 className={`font-medium text-gray-800 dark:text-[#E5E7EB] break-words pr-1 ${isCompact ? 'text-xs' : 'text-sm'} ${!isCompact && task.description ? 'mb-1' : (isCompact ? 'mb-0' : 'mb-0') }`}> {/* Adjusted margins */}
+      <h3 className={`font-medium text-gray-800 dark:text-[#E5E7EB] break-words pr-1 ${isCompact ? 'text-xs' : 'text-sm'} ${task.description || totalChecklistItems > 0 ? 'mb-1' : 'mb-0'}`}>
         {task.title}
       </h3>
       
@@ -71,9 +82,45 @@ const TaskCard: React.FC<TaskCardProps> = ({
         </p>
       )}
       
-      {/* Assignees and comments sections have been removed */}
-      {/* The card content (title, priority, etc.) will remain. If checklist items were to be shown directly on card, they would go here. */}
-
+      {totalChecklistItems > 0 && (
+        <div className={`mt-2 ${isCompact ? 'pt-1' : 'pt-2 border-t border-gray-100 dark:border-[#3C3C43]'}`}>
+          <h4 className="text-xs font-medium text-gray-600 dark:text-[#9CA3AF] mb-1">
+            Checklist ({completedChecklistItems}/{totalChecklistItems})
+          </h4>
+          {!isCompact && task.checklist.length > 0 && (
+            <div className="space-y-0.5">
+              {task.checklist.slice(0, MAX_CHECKLIST_ITEMS_ON_CARD).map(item => (
+                <div key={item.id} className="flex items-center space-x-1.5 group/checklist-item">
+                  <input 
+                    type="checkbox" 
+                    checked={item.completed} 
+                    onChange={(e) => {
+                        e.stopPropagation(); // Prevent card click
+                        onToggleChecklistItem(task.id, item.id, !item.completed);
+                    }}
+                    onClick={(e) => e.stopPropagation()} // Ensure propagation stop on click as well for safety
+                    className="form-checkbox h-3 w-3 rounded-sm text-indigo-600 border-gray-300 bg-gray-100 dark:bg-[#26262B] dark:border-[#505058] dark:checked:bg-indigo-500 cursor-pointer focus:ring-0 focus:ring-offset-0"
+                  />
+                  <span 
+                    className={`text-xs truncate cursor-default ${item.completed ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-[#D1D5DB]'}`}
+                    onClick={(e) => { // Allow clicking text to toggle as well, feels natural
+                        e.stopPropagation();
+                        onToggleChecklistItem(task.id, item.id, !item.completed);
+                    }}
+                  >
+                    {item.text}
+                  </span>
+                </div>
+              ))}
+              {task.checklist.length > MAX_CHECKLIST_ITEMS_ON_CARD && (
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">
+                  ...e mais {task.checklist.length - MAX_CHECKLIST_ITEMS_ON_CARD} {task.checklist.length - MAX_CHECKLIST_ITEMS_ON_CARD === 1 ? 'item' : 'itens'}.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

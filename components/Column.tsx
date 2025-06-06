@@ -16,6 +16,7 @@ interface ColumnProps {
   onDragOverColumn: (e: React.DragEvent<HTMLDivElement>, targetStageId: StageKey) => void;
   onDropTaskInColumn: (e: React.DragEvent<HTMLDivElement>, targetStageId: StageKey) => void;
   isDraggingOver: boolean;
+  onToggleChecklistItem: (taskId: string, itemId: string, completed: boolean) => Promise<void>; // Added prop
 }
 
 const PlusIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
@@ -35,6 +36,7 @@ const Column: React.FC<ColumnProps> = ({
   onDragOverColumn,
   onDropTaskInColumn,
   isDraggingOver,
+  onToggleChecklistItem, // Destructure new prop
 }) => {
   const stageConfig = STAGES_CONFIG.find(s => s.id === column.id);
   const accentColor = stageConfig?.accentColor || 'bg-gray-500 hover:bg-gray-600';
@@ -84,6 +86,7 @@ const Column: React.FC<ColumnProps> = ({
             onDelete={onDeleteTask}
             onUpdateTask={onUpdateTask}
             onDragStart={onDragStartTask}
+            onToggleChecklistItem={onToggleChecklistItem} // Pass down the prop
           />
         ))}
       </div>

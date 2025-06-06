@@ -542,7 +542,7 @@ const App: React.FC = () => {
     await supabase.from('checklist_items').update({ completed, updated_at: new Date().toISOString() }).eq('id', itemId).eq('task_id', taskId);
     setAllTasks(prev => prev.map(task => task.id === taskId ? {
       ...task,
-      checklist: task.checklist.map(ci => ci.id === itemId ? {...ci, completed} : ci)
+      checklist: sortChecklistItems(task.checklist.map(ci => ci.id === itemId ? {...ci, completed} : ci))
     } : task ));
   };
   const dbUpdateChecklistItemText = async (taskId: string, itemId: string, text: string) => {
@@ -550,7 +550,7 @@ const App: React.FC = () => {
      await supabase.from('checklist_items').update({ text, updated_at: new Date().toISOString() }).eq('id', itemId).eq('task_id', taskId);
      setAllTasks(prev => prev.map(task => task.id === taskId ? {
       ...task,
-      checklist: task.checklist.map(ci => ci.id === itemId ? {...ci, text} : ci)
+      checklist: sortChecklistItems(task.checklist.map(ci => ci.id === itemId ? {...ci, text} : ci))
     } : task ));
   };
   const dbDeleteChecklistItem = async (taskId: string, itemId: string) => {
@@ -558,7 +558,7 @@ const App: React.FC = () => {
     await supabase.from('checklist_items').delete().eq('id', itemId).eq('task_id', taskId);
      setAllTasks(prev => prev.map(task => task.id === taskId ? {
       ...task,
-      checklist: task.checklist.filter(ci => ci.id !== itemId)
+      checklist: sortChecklistItems(task.checklist.filter(ci => ci.id !== itemId))
     } : task ));
   };
 
@@ -792,6 +792,7 @@ const App: React.FC = () => {
                   onDragOverColumn={handleDragOver}
                   onDropTaskInColumn={handleDrop}
                   isDraggingOver={draggingOverColumn === column.id}
+                  onToggleChecklistItem={dbToggleChecklistItem} // Pass down the prop
                   />
               </div>
             ))}
