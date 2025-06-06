@@ -1,5 +1,5 @@
+
 import React, { useState } from 'react';
-import { ACCENT_COLOR_CLASS } from '../constants';
 
 interface LoginScreenProps {
   onLogin: (username: string, password: string) => Promise<void>;
@@ -19,20 +19,20 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, loginError }) => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-950 p-4 font-['Zain']">
-      <div className="w-full max-w-md p-8 bg-neutral-800 rounded-xl shadow-2xl">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 dark:bg-[#1B1B1F] p-4">
+      <div className="w-full max-w-md p-8 bg-white dark:bg-[#2A2A2E] dark:border dark:border-[#3C3C43] rounded-2xl shadow-2xl">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-['Sigmar_One'] text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-rose-400 mb-2">
+          <h1 className="text-3xl sm:text-4xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 mb-2">
             Planejamento Semanal
           </h1>
-          <p className="text-neutral-400">Faça login para continuar</p>
+          <p className="text-gray-600 dark:text-[#9CA3AF]">Faça login para continuar</p>
         </div>
         
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label 
               htmlFor="username" 
-              className="block text-sm font-medium text-neutral-300 mb-1"
+              className="block text-sm font-medium text-gray-700 dark:text-[#E5E7EB] mb-1"
             >
               Usuário
             </label>
@@ -44,7 +44,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, loginError }) => {
               required
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full p-3 bg-neutral-700 border border-neutral-600 rounded-md text-neutral-100 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none placeholder-neutral-500"
+              className="w-full p-3 bg-slate-50 border border-gray-300 rounded-lg text-gray-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none placeholder-gray-400 dark:bg-[#26262B] dark:border-[#3C3C43] dark:text-white dark:placeholder-[#9CA3AF] dark:focus:ring-indigo-500 dark:focus:border-indigo-500"
               placeholder="Digite seu usuário"
             />
           </div>
@@ -52,7 +52,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, loginError }) => {
           <div>
             <label 
               htmlFor="password" 
-              className="block text-sm font-medium text-neutral-300 mb-1"
+              className="block text-sm font-medium text-gray-700 dark:text-[#E5E7EB] mb-1"
             >
               Senha
             </label>
@@ -64,13 +64,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, loginError }) => {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-3 bg-neutral-700 border border-neutral-600 rounded-md text-neutral-100 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none placeholder-neutral-500"
+              className="w-full p-3 bg-slate-50 border border-gray-300 rounded-lg text-gray-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none placeholder-gray-400 dark:bg-[#26262B] dark:border-[#3C3C43] dark:text-white dark:placeholder-[#9CA3AF] dark:focus:ring-indigo-500 dark:focus:border-indigo-500"
               placeholder="Digite sua senha"
             />
           </div>
 
           {loginError && (
-            <div className="p-3 bg-red-800 border border-red-700 text-red-200 rounded-md text-sm">
+            <div className="p-3 bg-red-50 border border-red-300 text-red-700 rounded-md text-sm dark:bg-red-800/30 dark:border-red-700/50 dark:text-red-400">
               {loginError}
             </div>
           )}
@@ -79,15 +79,15 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, loginError }) => {
             <button
               type="submit"
               disabled={isLoading}
-              className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${ACCENT_COLOR_CLASS} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-neutral-800 focus:ring-purple-500 transition-opacity ${isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:opacity-90'}`}
+              className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white focus:ring-indigo-500 transition-opacity dark:focus:ring-offset-[#2A2A2E] dark:filter dark:brightness-110 dark:hover:brightness-125 ${isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:opacity-90'}`}
             >
               {isLoading ? 'Entrando...' : 'Entrar'}
             </button>
           </div>
         </form>
       </div>
-       <footer className="text-center text-sm text-neutral-600 mt-12 py-4">
-        Dados armazenados com <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:underline">Supabase</a>.
+       <footer className="text-center text-xs text-slate-500 dark:text-[#9CA3AF] mt-12 py-4">
+        Dados armazenados com <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline dark:text-indigo-400 dark:hover:underline">Supabase</a>.
       </footer>
     </div>
   );

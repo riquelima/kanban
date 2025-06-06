@@ -1,5 +1,6 @@
+
 import { createClient } from '@supabase/supabase-js';
-import { DayKey } from './types'; // Import DayKey
+import { StageKey } from './types'; // Changed DayKey to StageKey
 
 // ATENÇÃO: É uma melhor prática armazenar estas credenciais em variáveis de ambiente.
 // No entanto, seguindo a solicitação, elas estão hardcoded aqui.
@@ -23,7 +24,8 @@ export interface DbTask {
   id: string; // UUID
   title: string;
   description?: string | null;
-  day_id: DayKey; // Armazenará "MONDAY", "TUESDAY", etc.
+  day_id: StageKey; // Changed from DayKey to StageKey, as it stores "TODO", "IN_PROGRESS", etc.
+  priority?: string | null; // Added to match frontend expectations. Ensure this column exists in your Supabase 'tasks' table.
   created_at: string;
   updated_at: string;
   user_id?: string | null; // Adicionado para associar tarefas a usuários

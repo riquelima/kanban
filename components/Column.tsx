@@ -1,36 +1,32 @@
 
 import React from 'react';
-import { ColumnData, Task, DayKey } from '../types';
+import { ColumnData, Task, StageKey } from '../types';
 import TaskCard from './TaskCard';
 import IconButton from './IconButton';
-import { ACCENT_TEXT_COLOR_CLASS } from '../constants';
+import { STAGES_CONFIG } from '../constants'; 
 
 interface ColumnProps {
   column: ColumnData;
-  onAddTask: (dayId: DayKey) => void;
+  isCompact?: boolean; 
+  onAddTask: (stageId: StageKey) => void;
   onEditTask: (task: Task) => void;
-  onDeleteTask: (taskId: string, dayId: DayKey) => void;
-  onUpdateTask: (updatedTask: Task) => void; // Para UI local
-  onDragStartTask: (e: React.DragEvent<HTMLDivElement>, taskId: string, sourceDayId: DayKey) => void;
-  onDragOverColumn: (e: React.DragEvent<HTMLDivElement>, targetDayId: DayKey) => void;
-  onDropTaskInColumn: (e: React.DragEvent<HTMLDivElement>, targetDayId: DayKey) => void;
+  onDeleteTask: (taskId: string, stageId: StageKey) => void;
+  onUpdateTask: (updatedTask: Task) => void;
+  onDragStartTask: (e: React.DragEvent<HTMLDivElement>, taskId: string, sourceStageId: StageKey) => void;
+  onDragOverColumn: (e: React.DragEvent<HTMLDivElement>, targetStageId: StageKey) => void;
+  onDropTaskInColumn: (e: React.DragEvent<HTMLDivElement>, targetStageId: StageKey) => void;
   isDraggingOver: boolean;
-  onToggleFocus: (dayId: DayKey) => void;
-  isFocused: boolean;
-  // Novas props para interações com DB de checklist items
-  onToggleChecklistItemDB: (taskId: string, itemId: string, completed: boolean) => Promise<void>;
-  onUpdateChecklistItemTextDB: (taskId: string, itemId: string, newText: string) => Promise<void>;
-  onDeleteChecklistItemDB: (taskId: string, itemId: string) => Promise<void>;
 }
 
 const PlusIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" {...props}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
   </svg>
 );
 
 const Column: React.FC<ColumnProps> = ({
   column,
+  isCompact = false, 
   onAddTask,
   onEditTask,
   onDeleteTask,
@@ -39,51 +35,65 @@ const Column: React.FC<ColumnProps> = ({
   onDragOverColumn,
   onDropTaskInColumn,
   isDraggingOver,
-  onToggleFocus,
-  isFocused,
-  onToggleChecklistItemDB, // Passar adiante
-  onUpdateChecklistItemTextDB, // Passar adiante
-  onDeleteChecklistItemDB, // Passar adiante
 }) => {
+  const stageConfig = STAGES_CONFIG.find(s => s.id === column.id);
+  const accentColor = stageConfig?.accentColor || 'bg-gray-500 hover:bg-gray-600';
+  const dotColor = stageConfig?.dotColor || 'bg-gray-400';
+  // Use a slightly different dark background for columns to distinguish from main background and cards
+  const columnBgColor = 'bg-gray-100 dark:bg-[#202024]'; 
+  const columnWidthClass = isCompact ? 'w-72 md:w-[300px]' : 'w-80 md:w-[350px]';
+
   return (
     <div
-      className={`flex-shrink-0 ${isFocused ? 'w-full' : 'w-full md:w-80 lg:w-96'} bg-neutral-900 rounded-xl shadow-lg p-1 md:p-2 ${isDraggingOver ? 'drag-over' : ''} transition-all duration-300 ease-in-out`}
+      className={`flex-shrink-0 ${columnWidthClass} ${columnBgColor} rounded-2xl p-2 ${isDraggingOver ? 'drag-over dark:bg-[#2A2A2E]/50' : ''} transition-colors duration-150 ease-in-out flex flex-col`}
       onDragOver={(e) => onDragOverColumn(e, column.id)}
       onDrop={(e) => onDropTaskInColumn(e, column.id)}
+      style={{ animation: 'fadeIn 0.3s ease-out' }}
     >
-      <div className="flex justify-between items-center mb-4 p-3 sticky top-0 bg-neutral-900 z-10 rounded-t-xl">
-        <h2 
-          className={`font-semibold text-xl ${ACCENT_TEXT_COLOR_CLASS} ${!isFocused ? 'cursor-pointer hover:underline' : ''}`}
-          onClick={() => onToggleFocus(column.id)}
-          title={isFocused ? `Mostrar todos os dias` : `Focar em ${column.name}`}
+      {/* Column Header - prompt specified bg-transparent for header content, so it will inherit columnBgColor */}
+      <div className={`p-3 sticky top-0 z-10 ${columnBgColor} rounded-t-2xl dark:border-b dark:border-[#3C3C43]`}>
+        <div className="flex justify-between items-center mb-3">
+          <div className="flex items-center">
+            <span className={`w-2.5 h-2.5 ${dotColor} rounded-full mr-2.5`}></span>
+            <h2 className="font-semibold text-base text-gray-800 dark:text-[#F5F5F5]">{column.name}</h2>
+          </div>
+          <span className="text-xs text-gray-600 bg-gray-200 dark:text-[#9CA3AF] dark:bg-[#3C3C43] px-2 py-1 rounded-full font-medium">
+            {column.tasks.length} Total
+          </span>
+        </div>
+        <button 
+          onClick={() => onAddTask(column.id)} 
+          aria-label={`Adicionar nova tarefa em ${column.name}`}
+          className={`w-full px-3 py-2.5 ${accentColor} text-white text-sm font-medium rounded-xl flex items-center justify-center shadow-sm hover:shadow-md transition-all duration-200 dark:filter dark:brightness-110 dark:hover:brightness-125`}
         >
-          {column.name}
-        </h2>
-        <IconButton onClick={() => onAddTask(column.id)} ariaLabel={`Adicionar tarefa em ${column.name}`}>
-          <PlusIcon className={`w-6 h-6 ${ACCENT_TEXT_COLOR_CLASS} hover:text-purple-300`} />
-        </IconButton>
+          <PlusIcon className="w-4 h-4 mr-2" /> Nova Tarefa
+        </button>
       </div>
-      <div className={`px-2 pb-2 ${isFocused ? 'h-[calc(100vh-170px)]' : 'h-[calc(100vh-180px)] md:h-[calc(100vh-200px)]'} overflow-y-auto`}>
+      
+      <div className="px-2 pb-2 flex-grow overflow-y-auto h-[calc(100vh-260px)]"> 
         {column.tasks.length === 0 && (
-          <div className="text-center text-neutral-500 py-10">
-            Nenhuma tarefa aqui.
+          <div className="text-center text-slate-500 dark:text-[#9CA3AF] py-10 text-sm">
+            Nenhuma tarefa por enquanto.
           </div>
         )}
         {column.tasks.map(task => (
           <TaskCard
             key={task.id}
             task={task}
+            isCompact={isCompact} 
             onEdit={onEditTask}
             onDelete={onDeleteTask}
             onUpdateTask={onUpdateTask}
             onDragStart={onDragStartTask}
-            // Passando os handlers de DB para TaskCard
-            onToggleChecklistItemDB={onToggleChecklistItemDB}
-            onUpdateChecklistItemTextDB={onUpdateChecklistItemTextDB}
-            onDeleteChecklistItemDB={onDeleteChecklistItemDB}
           />
         ))}
       </div>
+       <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 };

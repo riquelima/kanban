@@ -1,19 +1,16 @@
 
 import React, { useCallback } from 'react';
-import { Task, ChecklistItem } from '../types';
-import ChecklistItemDisplay from './ChecklistItemDisplay';
+import { Task, ChecklistItem, Assignee, StageKey } from '../types';
 import IconButton from './IconButton';
-import { CARD_BACKGROUND_CLASS } from '../constants'; // CARD_BACKGROUND_CLASS is now yellow-700
+import { PRIORITY_STYLES } from '../constants';
 
 interface TaskCardProps {
   task: Task;
+  isCompact?: boolean; 
   onEdit: (task: Task) => void;
-  onDelete: (taskId: string, dayId: Task['dayId']) => void;
-  onUpdateTask: (updatedTask: Task) => void; // Para atualizar estado local síncrono
-  onDragStart: (e: React.DragEvent<HTMLDivElement>, taskId: string, sourceDayId: Task['dayId']) => void;
-  onToggleChecklistItemDB: (taskId: string, itemId: string, completed: boolean) => Promise<void>;
-  onUpdateChecklistItemTextDB: (taskId: string, itemId: string, newText: string) => Promise<void>;
-  onDeleteChecklistItemDB: (taskId: string, itemId: string) => Promise<void>;
+  onDelete: (taskId: string, stageId: StageKey) => void;
+  onUpdateTask: (updatedTask: Task) => void; 
+  onDragStart: (e: React.DragEvent<HTMLDivElement>, taskId: string, sourceStageId: StageKey) => void;
 }
 
 const EditIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
@@ -28,153 +25,55 @@ const TrashIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   </svg>
 );
 
-const sortChecklistItemsInternal = (items: ChecklistItem[]): ChecklistItem[] => {
-  return [...items].sort((a, b) => {
-    if (a.completed !== b.completed) {
-      return a.completed ? 1 : -1; // Uncompleted (false) items first
-    }
-    // If completion status is the same, sort by creation time
-    // Items without created_at (e.g., new client-side items) go last in their group
-    const timeA = a.created_at ? new Date(a.created_at).getTime() : Infinity;
-    const timeB = b.created_at ? new Date(b.created_at).getTime() : Infinity;
-
-    if (timeA === Infinity && timeB === Infinity) return 0; // Keep relative order of new items
-    return timeA - timeB; // Older persisted items first
-  });
-};
+// AssigneeAvatar and ChatBubbleOvalLeftEllipsisIcon are removed as they are no longer used in this file.
 
 const TaskCard: React.FC<TaskCardProps> = ({ 
   task, 
+  isCompact = false, 
   onEdit, 
   onDelete, 
-  onUpdateTask, 
   onDragStart,
-  onToggleChecklistItemDB,
-  onUpdateChecklistItemTextDB,
-  onDeleteChecklistItemDB,
 }) => {
   
-  const handleToggleChecklistItem = useCallback(async (itemId: string) => {
-    const itemToToggle = task.checklist.find(item => item.id === itemId);
-    if (!itemToToggle) return;
-
-    const newCompletedState = !itemToToggle.completed;
-    
-    let updatedChecklist = task.checklist.map(item =>
-      item.id === itemId ? { ...item, completed: newCompletedState } : item
-    );
-    updatedChecklist = sortChecklistItemsInternal(updatedChecklist);
-
-    try {
-      await onToggleChecklistItemDB(task.id, itemId, newCompletedState);
-      onUpdateTask({ ...task, checklist: updatedChecklist }); 
-    } catch (error) {
-      console.error("Failed to toggle checklist item in DB:", error);
-      // Revert optimistic update if needed (more robust error handling)
-      // For now, local state remains optimistically updated.
-    }
-  }, [task, onUpdateTask, onToggleChecklistItemDB]);
-
-  const handleUpdateChecklistItemText = useCallback(async (itemId: string, newText: string) => {
-    try {
-      await onUpdateChecklistItemTextDB(task.id, itemId, newText);
-      const updatedChecklist = task.checklist.map(item =>
-        item.id === itemId ? { ...item, text: newText } : item
-      );
-      // Text update doesn't change completed status, so existing sort order within groups is maintained.
-      // If it could, re-sorting would be needed: sortChecklistItemsInternal(updatedChecklist)
-      onUpdateTask({ ...task, checklist: updatedChecklist });
-    } catch (error) {
-      console.error("Failed to update checklist item text in DB:", error);
-    }
-  },[task, onUpdateTask, onUpdateChecklistItemTextDB]);
-  
-  const handleDeleteChecklistItem = useCallback(async (itemId: string) => {
-    try {
-      await onDeleteChecklistItemDB(task.id, itemId);
-      let updatedChecklist = task.checklist.filter(item => item.id !== itemId);
-      // No need to re-sort here as relative order of remaining items doesn't change based on deletion itself.
-      // The overall task completion status might change, triggering re-sort of tasks in App.tsx.
-      onUpdateTask({ ...task, checklist: updatedChecklist });
-    } catch (error) {
-      console.error("Failed to delete checklist item from DB:", error);
-    }
-  }, [task, onUpdateTask, onDeleteChecklistItemDB]);
-
-  const completedItems = task.checklist.filter(item => item.completed).length;
-  const totalItems = task.checklist.length;
-  const progress = totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
-  const isCompleted = totalItems > 0 && completedItems === totalItems;
-
-  const cardBaseClasses = "p-4 rounded-lg shadow-md mb-3 cursor-grab active:cursor-grabbing transition-all duration-150 font-['Roboto_Flex']";
-  
-  const titleClass = "text-black";
-  const descriptionClass = "text-black"; 
-  const iconClass = "text-black hover:text-purple-500"; 
-  const iconDeleteClass = "text-black hover:text-red-500"; 
-  const checklistLabelClass = "text-black";
-  const itemTextClass = "text-black";
-  const completedItemTextClass = "text-neutral-700";
-
-  const cardNormalStateClasses = `${CARD_BACKGROUND_CLASS} hover:shadow-lg hover:shadow-yellow-500/30`;
-  const progressTrackNormalClass = "bg-yellow-800"; 
-  
-  const cardCompletedStateClasses = "bg-emerald-800 border-2 border-emerald-500 hover:shadow-lg hover:shadow-emerald-400/40";
-  const progressTrackCompletedClass = "bg-emerald-900";
-
-  const sortedChecklistForDisplay = sortChecklistItemsInternal(task.checklist);
+  const priorityInfo = (task.priority && PRIORITY_STYLES[task.priority]) ? PRIORITY_STYLES[task.priority] : PRIORITY_STYLES["Default"];
 
   return (
     <div
       draggable
-      onDragStart={(e) => onDragStart(e, task.id, task.dayId)}
-      className={`${cardBaseClasses} ${isCompleted ? cardCompletedStateClasses : cardNormalStateClasses}`}
-      aria-label={`Tarefa: ${task.title}, ${isCompleted ? 'Concluída' : 'Pendente'}`}
+      onDragStart={(e) => onDragStart(e, task.id, task.stageId)}
+      className={`bg-white dark:bg-[#2A2A2E] dark:border dark:border-[#3C3C43] rounded-xl shadow-md dark:shadow-md dark:shadow-black/10 hover:shadow-lg dark:hover:shadow-black/20 mb-3 cursor-grab active:cursor-grabbing transition-all duration-150 group ${isCompact ? 'px-3 py-2.5' : 'px-4 py-3'}`}
+      aria-label={`Tarefa: ${task.title}`}
+      onClick={() => onEdit(task)} 
     >
       <div className="flex justify-between items-start mb-2">
-        <h3 className={`font-semibold text-md ${titleClass} break-words`}>{task.title}</h3>
-        <div className="flex space-x-1 flex-shrink-0">
-          <IconButton onClick={() => onEdit(task)} ariaLabel={`Editar tarefa ${task.title}`}>
-            <EditIcon className={`w-4 h-4 ${iconClass}`} />
+         {task.priority && (
+            <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${priorityInfo.pill} ${priorityInfo.text}`}>
+              {priorityInfo.display.replace(/ /g, '\u00A0')}
+            </span>
+          )}
+        <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity ml-auto"> {/* Added ml-auto to push icons to the right if priority is not present */}
+           <IconButton onClick={(e) => { e.stopPropagation(); onEdit(task);}} ariaLabel={`Editar tarefa ${task.title}`} className="p-1 hover:bg-slate-100 dark:hover:bg-[#3C3C43]">
+            <EditIcon className="w-3.5 h-3.5 text-slate-500 hover:text-indigo-500 dark:text-[#9CA3AF] dark:opacity-90 dark:hover:text-white dark:hover:opacity-100" />
           </IconButton>
-          <IconButton onClick={() => onDelete(task.id, task.dayId)} ariaLabel={`Excluir tarefa ${task.title}`}>
-            <TrashIcon className={`w-4 h-4 ${iconDeleteClass}`} />
+          <IconButton onClick={(e) => { e.stopPropagation(); onDelete(task.id, task.stageId);}} ariaLabel={`Excluir tarefa ${task.title}`} className="p-1 hover:bg-slate-100 dark:hover:bg-[#3C3C43]">
+            <TrashIcon className="w-3.5 h-3.5 text-slate-500 hover:text-red-500 dark:text-[#9CA3AF] dark:opacity-90 dark:hover:text-red-400 dark:hover:opacity-100" />
           </IconButton>
         </div>
       </div>
 
-      {task.description && (
-        <p className={`text-sm ${descriptionClass} mb-3 break-words`}>{task.description}</p>
+      <h3 className={`font-medium text-gray-800 dark:text-[#E5E7EB] break-words pr-1 ${isCompact ? 'text-xs' : 'text-sm'} ${!isCompact && task.description ? 'mb-1' : (isCompact ? 'mb-0' : 'mb-0') }`}> {/* Adjusted margins */}
+        {task.title}
+      </h3>
+      
+      {!isCompact && task.description && (
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 mb-2 break-words pr-1">
+          {task.description}
+        </p>
       )}
+      
+      {/* Assignees and comments sections have been removed */}
+      {/* The card content (title, priority, etc.) will remain. If checklist items were to be shown directly on card, they would go here. */}
 
-      {task.checklist && task.checklist.length > 0 && (
-        <div className="mb-3">
-          <div className="flex justify-between items-center mb-1">
-            <span className={`text-xs font-medium ${checklistLabelClass}`}>
-              Checklist ({completedItems}/{totalItems})
-            </span>
-          </div>
-          <div className={`w-full ${isCompleted ? progressTrackCompletedClass : progressTrackNormalClass} rounded-full h-1.5 mb-2`} role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
-            <div
-              className={`${isCompleted ? 'bg-emerald-400' : 'bg-purple-500'} h-1.5 rounded-full transition-all duration-300 ease-out`}
-              style={{ width: `${progress}%` }}
-            ></div>
-          </div>
-          <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
-            {sortedChecklistForDisplay.map((item: ChecklistItem) => (
-              <ChecklistItemDisplay
-                key={item.id}
-                item={item}
-                onToggle={handleToggleChecklistItem}
-                onUpdateText={handleUpdateChecklistItemText}
-                onDelete={handleDeleteChecklistItem}
-                itemTextColorClass={itemTextClass}
-                completedTextColorClass={completedItemTextClass}
-              />
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

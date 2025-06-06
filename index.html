@@ -7,38 +7,102 @@
   <title>Planejamento Semanal</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%238B5CF6'%3E%3Cpath fill-rule='evenodd' d='M6 3.75A2.75 2.75 0 018.75 1h6.5A2.75 2.75 0 0118 3.75v16.5A2.75 2.75 0 0115.25 23H8.75A2.75 2.75 0 016 20.25V3.75zm3 .75a.75.75 0 01.75-.75h4.5a.75.75 0 010 1.5h-4.5a.75.75 0 01-.75-.75zM9 9a.75.75 0 000 1.5h6a.75.75 0 000-1.5H9zm0 3a.75.75 0 000 1.5h6a.75.75 0 000-1.5H9zm0 3a.75.75 0 000 1.5h3a.75.75 0 000-1.5H9z' clip-rule='evenodd'/%3E%3C/svg%3E" type="image/svg+xml">
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class', // Habilita o modo escuro baseado em classe
+      theme: {
+        extend: {
+          // Adicione quaisquer extensões de tema personalizadas aqui, se necessário.
+          // Por exemplo, cores específicas do Notion para fácil reutilização:
+          // colors: {
+          //   notion: {
+          //     bg: '#1B1B1F',
+          //     card: '#2A2A2E',
+          //     input: '#26262B',
+          //     border: '#3C3C43',
+          //     textPrimary: '#F5F5F5',
+          //     textSecondary: '#9CA3AF',
+          //   }
+          // }
+        }
+      }
+    }
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:wght@400;700&family=Sigmar+One&family=Zain:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sigmar+One&display=swap" rel="stylesheet">
   <style>
     body {
-      font-family: 'Zain', sans-serif; /* Default font changed to Zain */
-      background-color: #1E1E1E; /* Cinza bem escuro */
-      color: #E0E0E0; /* Cor de texto padrão para dark mode */
+      font-family: 'Inter', sans-serif;
+      background-color: #F9FAFB; 
+      color: #1F2937; 
+      transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out;
     }
+    html.dark body {
+      background-color: #1B1B1F; /* Notion-like dark bg */
+      color: #F5F5F5; /* Notion-like main text */
+    }
+
     /* Custom scrollbar for webkit browsers */
+    /* Light theme scrollbar */
     ::-webkit-scrollbar {
       width: 8px;
       height: 8px;
     }
     ::-webkit-scrollbar-track {
-      background: #2D2D2D;
+      background: #E5E7EB; 
       border-radius: 10px;
     }
     ::-webkit-scrollbar-thumb {
-      background: #555;
+      background: #9CA3AF; 
       border-radius: 10px;
     }
     ::-webkit-scrollbar-thumb:hover {
-      background: #8B5CF6; /* Roxo Neon */
+      background: #6B7280; 
     }
+    /* Dark theme scrollbar */
+    html.dark ::-webkit-scrollbar-track {
+      background: #2A2A2E; /* Darker track */
+    }
+    html.dark ::-webkit-scrollbar-thumb {
+      background: #3C3C43; /* Muted thumb */
+    }
+    html.dark ::-webkit-scrollbar-thumb:hover {
+      background: #505058; /* Slightly lighter on hover */
+    }
+
+    /* Selection styles */
+    ::selection {
+      background-color: #DBEAFE; /* Light Indigo */
+      color: #312E81; /* Dark Indigo text */
+    }
+    html.dark ::selection {
+      background-color: #3730A3; /* Darker Indigo for selection bg in dark mode (indigo-800) */
+      color: #E0E7FF; /* Lighter text for selection in dark mode (indigo-200) */
+    }
+    
     .dragging {
-      opacity: 0.5;
-      transform: rotate(3deg);
+      opacity: 0.6;
+      transform: rotate(2deg) scale(1.02);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
     }
+    html.dark .dragging {
+      opacity: 0.7;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+    }
+
     .drag-over {
-      border: 2px dashed #8B5CF6; /* Roxo Neon */
-      background-color: rgba(139, 92, 246, 0.1);
+      background-color: rgba(0, 0, 0, 0.03);
+    }
+    html.dark .drag-over {
+      background-color: rgba(255, 255, 255, 0.05); /* Lighter overlay for dark */
+    }
+
+    .icon-text-align {
+      vertical-align: -0.125em; 
+    }
+    .font-sigmar-one {
+      font-family: 'Sigmar One', cursive;
     }
   </style>
 <script type="importmap">
@@ -50,6 +114,18 @@
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.49.10"
   }
 }
+</script>
+<script>
+  // Script para aplicar o tema no carregamento inicial e evitar FOUC
+  (function() {
+    const theme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (theme === 'dark' || (!theme && prefersDark)) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  })();
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>

@@ -1,50 +1,58 @@
+
 export interface ChecklistItem {
-  id: string; // UUID gerado pelo cliente ou Supabase
+  id: string;
   text: string;
   completed: boolean;
-  task_id?: string; // Para associar ao criar/atualizar no Supabase
+  task_id?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface Assignee {
+  id: string; // User ID or unique identifier for the assignee
+  avatarUrl?: string; // URL to avatar image
+  initials?: string; // Initials to display if no avatar
+  name?: string; // Full name for tooltips, etc.
 }
 
 export interface Task {
-  id: string; // UUID gerado pelo cliente ou Supabase
+  id: string;
   title: string;
   description?: string;
   checklist: ChecklistItem[];
-  dayId: DayKey; // Mapeia para tasks.day_id no Supabase
+  stageId: StageKey; // Changed from dayId
   created_at?: string;
   updated_at?: string;
-  user_id?: string; // Para associar tarefas a usuários no frontend
+  user_id?: string;
+  priority?: string; // e.g., "Important", "Meh", "High Priority", "OK"
+  assignees?: Assignee[];
+  commentsCount?: number;
 }
 
-export enum DayKey {
-  MONDAY = "MONDAY",
-  TUESDAY = "TUESDAY",
-  WEDNESDAY = "WEDNESDAY",
-  THURSDAY = "THURSDAY",
-  FRIDAY = "FRIDAY",
-  SATURDAY = "SATURDAY",
-  SUNDAY = "SUNDAY",
+export enum StageKey {
+  TODO = "TODO",
+  IN_PROGRESS = "IN_PROGRESS",
+  COMPLETED = "COMPLETED",
 }
 
 export interface ColumnData {
-  id: DayKey;
+  id: StageKey;
   name: string;
   tasks: Task[];
+  accentColor?: string; // For UI elements like buttons/dots
+  dotColor?: string; // Specific color for the dot in header
 }
 
 export interface User {
-  id: string; // UUID do usuário no Supabase
+  id: string;
   username: string;
 }
 
-// Tipos para a funcionalidade "What's New"
 export interface ReleaseUpdate {
   id: string;
   version_tag: string;
   title: string;
-  content_html: string; // Conteúdo em HTML para o popup
+  content_html: string;
   created_at: string;
 }
 
