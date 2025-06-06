@@ -142,19 +142,72 @@ const App: React.FC = () => {
         .limit(1)
         .single();
 
-      if (latestUpdateError && latestUpdateError.code !== 'PGRST116') {
+      if (latestUpdateError && latestUpdateError.code !== 'PGRST116') { // PGRST116: no rows found
         console.error("Error fetching latest release update:", latestUpdateError);
         return;
       }
-      if (!latestUpdateData) return;
+      
+      // If no data, or to simulate for this exercise, we can define default content
+      // For this exercise, we will *override* the fetched content with the latest changes.
+      let currentRelease: ReleaseUpdate;
 
-      const currentRelease: ReleaseUpdate = latestUpdateData as DbReleaseUpdate;
+      if (latestUpdateData) {
+        currentRelease = {
+          ...(latestUpdateData as DbReleaseUpdate),
+          version_tag: latestUpdateData.version_tag || "v3.1.0", // Ensure version_tag is present
+          title: "🚀 Novidades e Melhorias Recentes!",
+          content_html: `
+            <h3 style="color: #6366f1; margin-top: 1em; margin-bottom: 0.5em; font-size: 1.125em; font-weight: 600;">✨ Novidades e Melhorias Fresquinhas! ✨</h3>
+            <p>Confira o que preparamos para turbinar seu planejamento semanal:</p>
+            <ul style="list-style-type: disc; padding-left: 20px; margin-top: 0.75em;">
+                <li style="margin-bottom: 0.75em;">
+                    <strong>🎨 Modo Escuro Elegante (Estilo Notion):</strong> Mergulhe em uma interface sofisticada com nosso novo tema escuro. Conforto visual e foco total, ativado com um clique no botão 🌙/🌞 no canto inferior direito. Seus olhos agradecem!
+                </li>
+                <li style="margin-bottom: 0.75em;">
+                    <strong>🧹 Cards de Tarefas Mais Diretos:</strong> Simplificamos os cards! Removemos os avatares de usuários e os contadores de comentários para uma visualização mais limpa e objetiva das suas tarefas. Menos distrações, mais produtividade.
+                </li>
+                <li style="margin-bottom: 0.75em;">
+                    <strong>📐 Layout de Colunas Otimizado:</strong> Suas colunas Kanban agora estão mais inteligentes! Elas se centralizam na tela, distribuindo o espaço proporcionalmente. Em telas menores, o scroll horizontal garante que nada fique apertado. Organização e fluidez para seu fluxo de trabalho.
+                </li>
+            </ul>
+            <p style="margin-top: 1.25em; font-style: italic;">Esperamos que essas melhorias tornem seu planejamento ainda mais eficiente e agradável!</p>
+          `
+        };
+      } else {
+        // Fallback if no data is fetched (e.g., empty table or first run)
+        // This part might not be hit if PGRST116 is handled correctly and returns.
+        // For safety, providing a default structure.
+        console.warn("No release updates found in DB, using default 'What's New' content.");
+        currentRelease = {
+          id: 'default-release-id',
+          version_tag: "v3.1.0-local",
+          title: "🚀 Novidades e Melhorias Recentes!",
+          created_at: new Date().toISOString(),
+          content_html: `
+            <h3 style="color: #6366f1; margin-top: 1em; margin-bottom: 0.5em; font-size: 1.125em; font-weight: 600;">✨ Novidades e Melhorias Fresquinhas! ✨</h3>
+            <p>Confira o que preparamos para turbinar seu planejamento semanal:</p>
+            <ul style="list-style-type: disc; padding-left: 20px; margin-top: 0.75em;">
+                <li style="margin-bottom: 0.75em;">
+                    <strong>🎨 Modo Escuro Elegante (Estilo Notion):</strong> Mergulhe em uma interface sofisticada com nosso novo tema escuro. Conforto visual e foco total, ativado com um clique no botão 🌙/🌞 no canto inferior direito. Seus olhos agradecem!
+                </li>
+                <li style="margin-bottom: 0.75em;">
+                    <strong>🧹 Cards de Tarefas Mais Diretos:</strong> Simplificamos os cards! Removemos os avatares de usuários e os contadores de comentários para uma visualização mais limpa e objetiva das suas tarefas. Menos distrações, mais produtividade.
+                </li>
+                <li style="margin-bottom: 0.75em;">
+                    <strong>📐 Layout de Colunas Otimizado:</strong> Suas colunas Kanban agora estão mais inteligentes! Elas se centralizam na tela, distribuindo o espaço proporcionalmente. Em telas menores, o scroll horizontal garante que nada fique apertado. Organização e fluidez para seu fluxo de trabalho.
+                </li>
+            </ul>
+            <p style="margin-top: 1.25em; font-style: italic;">Esperamos que essas melhorias tornem seu planejamento ainda mais eficiente e agradável!</p>
+          `
+        };
+      }
+
 
       const { data: viewData, error: viewError } = await supabase
         .from('user_update_views')
         .select('*')
         .eq('user_id', user.id)
-        .eq('release_update_id', currentRelease.id)
+        .eq('release_update_id', currentRelease.id) // Use currentRelease.id, which might be from DB or mocked
         .single();
 
       if (viewError && viewError.code !== 'PGRST116') {
@@ -164,7 +217,11 @@ const App: React.FC = () => {
 
       let loginCountForThisUpdate = viewData ? (viewData as DbUserUpdateView).login_count_for_update : 0;
 
-      if (loginCountForThisUpdate < 3) {
+      // Logic to show popup (e.g., show for first 3 logins after an update)
+      // This threshold (e.g., 3) could also be part of the release_updates table if desired
+      const showPopupThreshold = 3; 
+
+      if (loginCountForThisUpdate < showPopupThreshold) {
         setWhatsNewDetails(currentRelease);
         setIsWhatsNewOpen(true);
 
@@ -177,14 +234,19 @@ const App: React.FC = () => {
             })
             .eq('id', (viewData as DbUserUpdateView).id);
         } else {
-          await supabase
-            .from('user_update_views')
-            .insert({
-              user_id: user.id,
-              release_update_id: currentRelease.id,
-              login_count_for_update: 1,
-              last_seen_at: new Date().toISOString()
-            });
+          // Only insert if currentRelease.id is a valid ID (from DB or a well-defined mock)
+          // If currentRelease.id is 'default-release-id' from a full fallback, you might skip DB insert
+          // or ensure 'default-release-id' is a temporary placeholder not meant for DB persistence.
+          if (currentRelease.id !== 'default-release-id') { 
+            await supabase
+              .from('user_update_views')
+              .insert({
+                user_id: user.id,
+                release_update_id: currentRelease.id,
+                login_count_for_update: 1,
+                last_seen_at: new Date().toISOString()
+              } as DbUserUpdateView); // Cast to DbUserUpdateView if 'id' is not part of insert
+          }
         }
       }
     } catch (err) { console.error("Error in checkAndShowWhatsNew:", err); }
@@ -248,10 +310,13 @@ const App: React.FC = () => {
       .map(ci => ({ ...ci, task_id: ci.task_id }));
 
     const randomPriorityKey = dbTask.priority || priorityKeysForMocking[Math.floor(Math.random() * priorityKeysForMocking.length)];
+    // Assignees and comments are no longer part of the TaskCard, so mocking them here has less visual impact
+    // but the data structure might still expect them for other views or logic.
     const numAssignees = Math.floor(Math.random() * (mockAssigneesData.length + 1));
     const shuffledAssignees = [...mockAssigneesData].sort(() => 0.5 - Math.random());
     const selectedAssignees = shuffledAssignees.slice(0, numAssignees);
     const commentsCount = Math.random() > 0.3 ? Math.floor(Math.random() * 50) +1 : 0;
+
 
     return {
       id: dbTask.id,
@@ -263,8 +328,8 @@ const App: React.FC = () => {
       created_at: dbTask.created_at,
       updated_at: dbTask.updated_at,
       priority: randomPriorityKey,
-      assignees: selectedAssignees,
-      commentsCount: commentsCount,
+      assignees: selectedAssignees, // Keep for data consistency, though not displayed on card
+      commentsCount: commentsCount, // Keep for data consistency
     };
   }, [mockAssigneesData, priorityKeysForMocking]);
 
@@ -694,10 +759,10 @@ const App: React.FC = () => {
           />
         )}
         {(activeView === 'column' || activeView === 'compactColumn') && (
-          <div className="flex space-x-4 min-w-max h-full overflow-x-auto">
+          <div className="flex flex-row justify-start md:justify-center gap-6 px-4 py-2 overflow-x-auto h-full">
             {isLoading && columns.every(c => c.tasks.length === 0) ? (
-                 STAGES_CONFIG.map(stageInfo => ( // Render skeleton columns while loading
-                    <div key={stageInfo.id} className={`flex-shrink-0 ${activeView === 'compactColumn' ? 'w-72 md:w-[300px]' : 'w-80 md:w-[350px]'} bg-gray-100 dark:bg-[#202024] rounded-2xl p-2 flex flex-col`}>
+                 STAGES_CONFIG.map(stageInfo => ( 
+                    <div key={stageInfo.id} className={`flex flex-col flex-1 min-w-[300px] sm:min-w-[320px] max-w-sm bg-gray-100 dark:bg-[#202024] rounded-2xl p-2`}>
                          <div className="p-3 sticky top-0 z-10 bg-gray-100 dark:bg-[#202024] rounded-t-2xl">
                             <div className="flex justify-between items-center mb-3">
                                 <div className="flex items-center">
@@ -709,13 +774,13 @@ const App: React.FC = () => {
                             <div className="h-10 bg-gray-300 dark:bg-gray-700 rounded-xl animate-pulse"></div>
                         </div>
                         <div className="px-2 pb-2 flex-grow overflow-y-auto">
-                            <div className="h-20 bg-gray-200 dark:bg-gray-700/50 rounded-2xl animate-pulse mb-3"></div>
-                            <div className="h-16 bg-gray-200 dark:bg-gray-700/50 rounded-2xl animate-pulse"></div>
+                            <div className="h-20 bg-gray-200 dark:bg-gray-700/50 rounded-xl animate-pulse mb-3"></div>
+                            <div className="h-16 bg-gray-200 dark:bg-gray-700/50 rounded-xl animate-pulse"></div>
                         </div>
                     </div>
                 ))
             ) : columns.map(column => (
-              <div key={column.id} onDragLeave={handleDragLeaveColumn} className="h-full">
+              <div key={column.id} onDragLeave={handleDragLeaveColumn} className="h-full flex"> {/* Ensure this div also allows column to flex */}
                   <Column
                   column={column}
                   isCompact={activeView === 'compactColumn'}

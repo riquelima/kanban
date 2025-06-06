@@ -39,13 +39,12 @@ const Column: React.FC<ColumnProps> = ({
   const stageConfig = STAGES_CONFIG.find(s => s.id === column.id);
   const accentColor = stageConfig?.accentColor || 'bg-gray-500 hover:bg-gray-600';
   const dotColor = stageConfig?.dotColor || 'bg-gray-400';
-  // Use a slightly different dark background for columns to distinguish from main background and cards
   const columnBgColor = 'bg-gray-100 dark:bg-[#202024]'; 
-  const columnWidthClass = isCompact ? 'w-72 md:w-[300px]' : 'w-80 md:w-[350px]';
+  // Removed columnWidthClass, width is now handled by flex-1, min-w, and max-w
 
   return (
     <div
-      className={`flex-shrink-0 ${columnWidthClass} ${columnBgColor} rounded-2xl p-2 ${isDraggingOver ? 'drag-over dark:bg-[#2A2A2E]/50' : ''} transition-colors duration-150 ease-in-out flex flex-col`}
+      className={`flex flex-col flex-1 min-w-[300px] sm:min-w-[320px] max-w-sm ${columnBgColor} rounded-2xl p-2 ${isDraggingOver ? 'drag-over dark:bg-[#2A2A2E]/50' : ''} transition-colors duration-150 ease-in-out`}
       onDragOver={(e) => onDragOverColumn(e, column.id)}
       onDrop={(e) => onDropTaskInColumn(e, column.id)}
       style={{ animation: 'fadeIn 0.3s ease-out' }}
